@@ -1,0 +1,13 @@
+---
+##########################
+# versions
+
+manager_version: latest
+openstack_version: 2024.2
+
+##########################
+# configuration
+
+configuration_git_port: 443
+configuration_git_protocol: https
+configuration_git_repository: osism/metalbox.git
