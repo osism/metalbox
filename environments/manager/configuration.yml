@@ -6,9 +6,10 @@ manager_version: latest
 openstack_version: 2024.2
 
 ##########################################################
-# ara
+# services
 
-ara_enable: false
+enable_ara: false
+enable_ceph_ansible: false
 
 ##########################################################
 # configuration
