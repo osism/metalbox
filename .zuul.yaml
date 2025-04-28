@@ -1,9 +1,20 @@
 ---
+- job:
+    name: metalbox-mirror-container-images
+    nodeset: ubuntu-noble-large
+    pre-run: zuul/pre-mirror-container-images.yml
+    run: zuul/mirror-container-images.yml
+    files:
+      - "^zuul/mirror-container-images.yml"
+      - "^zuul/pre-mirror-container-images.yml"
+      - "^zuul/vars/container-images.yml"
+
 - project:
     merge-mode: squash-merge
     default-branch: main
     check:
       jobs:
+        - metalbox-mirror-container-images
         - ansible-lint
         - yamllint
     periodic-daily:
