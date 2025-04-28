@@ -10,7 +10,7 @@ ANSIBLE_COLLECTION_COMMONS_SOURCE=${ANSIBLE_COLLECTION_COMMONS_SOURCE:-git+https
 ANSIBLE_COLLECTION_SERVICES_SOURCE=${ANSIBLE_COLLECTION_SERVICES_SOURCE:-git+https://github.com/osism/ansible-collection-services}
 ANSIBLE_PLAYBOOKS_MANAGER_SOURCE=${ANSIBLE_PLAYBOOKS_MANAGER_SOURCE:-git+https://github.com/osism/ansible-playbooks-manager}
 
-ANSIBLE_VERSION=${ANSIBLE_VERSION:-9.4.0}
+ANSIBLE_VERSION=${ANSIBLE_VERSION:-11.4.0}
 
 INSTALL_ANSIBLE=${INSTALL_ANSIBLE:-true}
 INSTALL_ANSIBLE_ROLES=${INSTALL_ANSIBLE_ROLES:-true}
@@ -35,8 +35,9 @@ if [[ $INSTALL_ANSIBLE == "true" ]]; then
 
         # shellcheck source=/dev/null
         source "$VENV_PATH/bin/activate"
-        pip3 install -r requirements.txt
-        pip3 install "ansible==$ANSIBLE_VERSION"
+        pip3 install uv
+        uv pip install -r requirements.txt
+        uv pip install "ansible==$ANSIBLE_VERSION"
 
     else
 
@@ -73,6 +74,10 @@ if [[ $INSTALL_ANSIBLE_ROLES == "true" ]]; then
     ansible-galaxy collection install -f "${ANSIBLE_COLLECTION_COMMONS_SOURCE},${ANSIBLE_COLLECTION_COMMONS_VERSION}"
     ansible-galaxy collection install -f "${ANSIBLE_COLLECTION_SERVICES_SOURCE},${ANSIBLE_COLLECTION_SERVICES_VERSION}"
     ansible-galaxy collection install -f "${ANSIBLE_PLAYBOOKS_MANAGER_SOURCE},${ANSIBLE_PLAYBOOKS_MANAGER_VERSION}"
+fi
+
+if [[ "$playbook" == "noop" ]]; then
+    exit 0
 fi
 
 if [[ \
