@@ -14,6 +14,8 @@ enable_ceph_ansible: false
 ##########################################################
 # configuration
 
+configuration_git_version: main
+
 configuration_git_port: 443
 configuration_git_protocol: https
 configuration_git_repository: osism/metalbox.git
