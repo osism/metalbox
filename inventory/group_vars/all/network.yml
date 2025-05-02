@@ -16,3 +16,8 @@ network_ethernets:
     dhcp4: no
     dhcp6: no
     link-local: [ipv6]
+
+network_dummy_devices:
+  dummy0:
+    addresses:
+      - 192.168.42.10/24
