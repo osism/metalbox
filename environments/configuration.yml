@@ -1,2 +1,9 @@
 ---
-dummy:
+# docker
+docker_opts:
+  max-concurrent-downloads: 20
+# renovate: datasource=github-releases depName=moby/moby
+docker_version: '5:27.5.1'
+docker_facts: false
+docker_insecure_registries:
+  - localhost:5000
