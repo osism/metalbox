@@ -27,6 +27,7 @@ images_kolla:
   - ironic-conductor:2024.2
   - ironic-inspector:2024.2
   - ironic-pxe:2024.2
+  - keepalived:2024.2
   - keystone-fernet:2024.2
   - keystone-ssh:2024.2
   - keystone:2024.2
