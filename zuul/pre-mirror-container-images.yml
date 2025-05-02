@@ -1,0 +1,15 @@
+---
+- name: Prepare mirroring of container images
+  hosts: all
+
+  tasks:
+    - name: Install required packages
+      become: true
+      ansible.builtin.apt:
+        name:
+          - python3-docker
+          - python3-requests
+          - skopeo
+
+  roles:
+    - ensure-docker

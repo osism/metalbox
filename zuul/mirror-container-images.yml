@@ -1,0 +1,79 @@
+---
+- name: Mirror container images
+  hosts: all
+
+  vars_files:
+    - vars/container-images.yml
+
+  tasks:
+    - name: Create registry volume
+      community.docker.docker_volume:
+        name: registry
+
+    - name: Run local container registry
+      community.docker.docker_container:
+        name: registry
+        image: registry:3
+        state: started
+        ports:
+          - "5000:5000"
+        volumes:
+          - registry:/var/lib/registry
+
+    - name: Copy images
+      ansible.builtin.command:
+        cmd: "skopeo copy --dest-tls-verify=false docker://docker.io/{{ item }} docker://localhost:5000/osism/{{ item }}"
+      loop: "{{ images }}"
+      changed_when: false
+
+    - name: Copy manager images
+      ansible.builtin.command:
+        cmd: "skopeo copy --dest-tls-verify=false docker://registry.osism.tech/osism/{{ item }} docker://localhost:5000/osism/{{ item }}"
+      loop: "{{ images_manager }}"
+      changed_when: false
+
+    - name: Copy kolla images
+      ansible.builtin.command:
+        cmd: "skopeo copy --dest-tls-verify=false docker://registry.osism.tech/kolla/{{ item }} docker://localhost:5000/kolla/{{ item }}"
+      loop: "{{ images_kolla }}"
+      changed_when: false
+
+    - name: Stop local container registry
+      community.docker.docker_container:
+        name: registry
+        state: stopped
+
+    - name: Run export container
+      community.docker.docker_container:
+        name: export
+        image: alpine
+        state: started
+        command: sh -c 'sleep infinity'
+        volumes:
+          - registry:/volume
+          - "./:/export"
+
+    - name: Export registry volume
+      community.docker.docker_container_exec:
+        container: export
+        command: sh -c 'cd /volume && tar cjf /export/registry.tar.bz2 .'
+
+    - name: Get size of export archive
+      ansible.builtin.stat:
+        path: registry.tar.bz2
+      register: result
+
+    - name: Print size of export archive
+      ansible.builtin.debug:
+        msg: "{{ (result.stat.size / (1024 * 1024)) | round(2) }} MB"
+      when: result.stat.exists
+
+    - name: Run docker build script
+      ansible.builtin.shell:
+        executable: /bin/bash
+        cmd: |
+          set -e
+          set -x
+
+          docker build -t registry.osism.tech/osism/metalbox:2024.2 -f {{ zuul.project.src_dir }}/zuul/files/Dockerfile .
+      changed_when: false

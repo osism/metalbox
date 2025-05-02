@@ -1,0 +1,36 @@
+---
+images:
+  - hashicorp/vault:1.19.0
+  - library/httpd:alpine
+  - library/mariadb:11.7.2
+  - library/postgres:16.8-alpine
+  - library/redis:7.4.3-alpine
+  - library/traefik:v3.3.5
+  - ubuntu/squid:6.1-23.10_beta
+
+images_manager:
+  - ara-server:1.7.2
+  - dnsmasq-osism:2.90
+  - inventory-reconciler:latest
+  - kolla-ansible:2024.2
+  - netbox:v4.2.2
+  - openstackclient:2024.2
+  - osism-ansible:latest
+  - osism:latest
+  - rsync:latest
+
+images_kolla:
+  - cron:2024.2
+  - haproxy-ssh:2024.2
+  - haproxy:2024.2
+  - ironic-api:2024.2
+  - ironic-conductor:2024.2
+  - ironic-inspector:2024.2
+  - ironic-pxe:2024.2
+  - keystone-fernet:2024.2
+  - keystone-ssh:2024.2
+  - keystone:2024.2
+  - kolla-toolbox:2024.2
+  - mariadb-clustercheck:2024.2
+  - mariadb-server:2024.2
+  - rabbitmq:2024.2
