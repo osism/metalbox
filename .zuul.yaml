@@ -1,4 +1,30 @@
 ---
+- secret:
+    name: SECRET_METALBOX
+    data:
+      MINIO_ACCESS_KEY: !encrypted/pkcs1-oaep
+        - faa0NzYJ3Nsbw74BnOaZsnKhmmaDR/gl9TWn3rHVnDdHEmhBkXDdgUiva79pEQcCGWX0t
+          QfKyV3RY2MLsmesbiYRB4UMkC4gZMKQj9PQq7fSIjLUfPOzrh9V1FjztdYvJmQgq0dMZM
+          BMzamfjaf0bqeuxhEvL4AYmhaDYeS3OXI6ulXjpk69DX9EcbLyCMm2UlfLdKwPIf0D3OQ
+          JyPtgVLDMrTtiumzJ9UcB9GumORUtbqtRdcPq/+8ls+ULVsauz3nbO44zHseLyMeVxe23
+          fyk2b76psM+Tp1G3lBhTVE3p+1BxuDk8TKhQZoE2ANTc8YZr/V3aR9BCce01UOvatycfv
+          w71MdspoZ0IpoXH5gv9vw3QAf8b79I0DFO5f0JdncjlaZ+iPKUmhDE9X3qfUZ1RfyqErg
+          U5Qm+WH2T9yXawoCjleGec8WzbZMs4TWAJtsoD8aKG7j1gtpqO7s0UuYV8jnwBuy6REeL
+          jCGDPc+xMjJ+w1WqZHsbPiIFo5MKs/+IMVWp37jaw7/qJ69vghy1PeKs8duCMLXBI5hjl
+          4OVWoA5NG/WgR58rUhIapFNw7y7eNFSVzmV7a3Aghcm9za7nVSEKjiPiufZONNBZaWDkL
+          6YRnPzQQ/8Qva4y4BZsbkKKv9u12FH8Z8iNC8MlziVhEuwKVzlEIt1WuFjpHY0=
+      MINIO_SECRET_KEY: !encrypted/pkcs1-oaep
+        - kRs8EUzlNs8a6/Tkk0hxTEOqxB4k+cZtAUjn6y/9ZaNjkjJEy/n9F+FeOlhtwi7gLBY8v
+          DlUQAK2AJcZonN4uC0isTip7oG+siDWiFBkuED7AeW6J93mok3fwAlJwH2Y7ULjtuFDhS
+          fYe/uzunbMrScbU9uMJi0wDTI8qbPHY7F39l97fFQzkNYM2e1RdkxG6/xj4qsrVUIh7Ui
+          PdnTii1vghlhpmGyxoos6wvekQ66ZRFfWZHu5vHSzFwc4oDEP76TCQx1ue5vqjH5gQO0v
+          cBQmWb27EU4D5U8V58UhsnXLIUf/qwU9tjAmf84fZqjo854rxx3HJ2QfVIWJgT7Zdoajx
+          pOUnHlgcQmUeDvUUHMpjnwFVGBY6ifh0CJd46KDzeNZz6j8t8mkBxJdhjblqQk+rfsUVD
+          J6kYASLVq0aYPhRyqm11XvWy0WLRjDZ/GlOGpzXtA2KeCWoOln3J5imF4QZasCQbU/n1P
+          PrQo9POC/sFtW99B4TLvfgL1N4hGDlibmMQf6Ay3QBThP2PEJbnvthrmOW6oYu0QsrIgU
+          NAFPhdMfF/hmCSUp5QLgOgu8Hf9+QS05V20Z3KPc5j1BAT2DnRJ60bUEzdd8SkNWlPAi0
+          Kt2bPK4K5S1JfDWYwFqZJrrzeblzBSsnJTZ0t5KFQmmHwd6KCP4le6+ur+ik/A=
+
 - job:
     name: metalbox-mirror-container-images
     nodeset: ubuntu-noble-large
@@ -8,6 +34,16 @@
       - "^zuul/mirror-container-images.yml"
       - "^zuul/pre-mirror-container-images.yml"
       - "^zuul/vars/container-images.yml"
+
+- job:
+    name: metalbox-mirror-container-images-publish
+    parent: metalbox-mirror-container-images
+    vars:
+      publish: true
+    secrets:
+      - name: minio
+        secret: SECRET_METALBOX
+        pass-to-parent: true
 
 - project:
     merge-mode: squash-merge
@@ -21,3 +57,7 @@
       jobs:
         - ansible-lint
         - yamllint
+    post:
+      jobs:
+        - metalbox-mirror-container-images-publish:
+            branches: main

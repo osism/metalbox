@@ -5,6 +5,9 @@
   vars_files:
     - vars/container-images.yml
 
+  vars:
+    _publish: "{{ publish | default(False) }}"
+
   tasks:
     - name: Create registry volume
       community.docker.docker_volume:
@@ -68,12 +71,24 @@
         msg: "{{ (result.stat.size / (1024 * 1024)) | round(2) }} MB"
       when: result.stat.exists
 
-    - name: Run docker build script
-      ansible.builtin.shell:
+    # - name: Run build script
+    #   ansible.builtin.shell:
+    #     executable: /bin/bash
+    #     cmd: |
+    #       set -e
+    #       set -x
+    #
+    #       docker build -t registry.osism.tech/osism/metalbox:2024.2 -f {{ zuul.project.src_dir }}/zuul/files/Dockerfile .
+    #   changed_when: false
+
+    - name: Run upload script
+      ansible.builtin.shell:  # noqa command-instead-of-module
         executable: /bin/bash
         cmd: |
-          set -e
-          set -x
-
-          docker build -t registry.osism.tech/osism/metalbox:2024.2 -f {{ zuul.project.src_dir }}/zuul/files/Dockerfile .
-      changed_when: false
+          wget https://dl.min.io/client/mc/release/linux-amd64/mc
+          chmod +x mc
+          ./mc alias set minio https://swift.services.a.regiocloud.tech {{ minio.MINIO_ACCESS_KEY | trim }} {{ minio.MINIO_SECRET_KEY | trim }}
+          ./mc cp registry.tar.bz2 minio/metalbox
+      when: _publish | bool
+      no_log: true
+      changed_when: true
