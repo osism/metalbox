@@ -10,6 +10,8 @@ openstack_version: 2024.2
 
 enable_ara: false
 enable_ceph_ansible: false
+enable_osism_kubernetes: false
+enable_vault: false
 
 ##########################################################
 # configuration
