@@ -7,3 +7,8 @@ docker_version: '5:27.5.1'
 docker_facts: false
 docker_insecure_registries:
   - localhost:5000
+
+# hosts
+hosts_type: template
+hosts_additional_entries:
+  api.metalbox.osism.xyz: 192.168.42.10
