@@ -45,6 +45,7 @@
       community.docker.docker_container:
         name: registry
         state: stopped
+      when: _publish | bool
 
     - name: Run export container
       community.docker.docker_container:
@@ -55,21 +56,26 @@
         volumes:
           - registry:/volume
           - "./:/export"
+      when: _publish | bool
 
     - name: Export registry volume
       community.docker.docker_container_exec:
         container: export
         command: sh -c 'cd /volume && tar cjf /export/registry.tar.bz2 .'
+      when: _publish | bool
 
     - name: Get size of export archive
       ansible.builtin.stat:
         path: registry.tar.bz2
       register: result
+      when: _publish | bool
 
     - name: Print size of export archive
       ansible.builtin.debug:
         msg: "{{ (result.stat.size / (1024 * 1024)) | round(2) }} MB"
-      when: result.stat.exists
+      when:
+        - _publish | bool
+        - result.stat.exists
 
     # - name: Run build script
     #   ansible.builtin.shell:
