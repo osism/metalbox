@@ -14,6 +14,26 @@ enable_osism_kubernetes: false
 enable_vault: false
 
 ##########################################################
+# api
+
+osism_api_host: 192.168.42.10
+
+##########################################################
+# broker
+
+manager_listener_broker_hosts:
+  - 192.168.42.10
+manager_listener_broker_username: openstack
+manager_listener_broker_uri: "{% for host in manager_listener_broker_hosts %}amqp://{{ manager_listener_broker_username }}:{{ manager_listener_broker_password }}@{{ host }}:5672/{% if not loop.last %};{% endif %}{% endfor %}"
+
+##########################################################
+# netbox
+
+netbox_enable: true
+netbox_host: 192.168.42.10
+netbox_api_url: "http://{{ netbox_host }}:8121"
+
+##########################################################
 # configuration
 
 configuration_git_version: main

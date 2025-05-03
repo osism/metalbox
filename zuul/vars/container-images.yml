@@ -6,6 +6,7 @@ images:
   - library/postgres:16.8-alpine
   - library/redis:7.4.3-alpine
   - library/traefik:v3.3.5
+  - pgautoupgrade/pgautoupgrade:16-alpine
   - ubuntu/squid:6.1-23.10_beta
 
 images_manager:

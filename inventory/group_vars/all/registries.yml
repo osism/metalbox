@@ -6,3 +6,6 @@ docker_registry_dnsdist: localhost:5000
 docker_registry_kolla: localhost:5000
 docker_registry_netbox: localhost:5000
 docker_registry_openstackclient: localhost:5000
+docker_registry_pgautoupgrade: localhost:5000
+docker_registry_postgres: localhost:5000
+docker_registry_redis: localhost:5000

@@ -25,7 +25,7 @@
 
     - name: Copy images
       ansible.builtin.command:
-        cmd: "skopeo copy --dest-tls-verify=false docker://docker.io/{{ item }} docker://localhost:5000/osism/{{ item }}"
+        cmd: "skopeo copy --dest-tls-verify=false docker://docker.io/{{ item }} docker://localhost:5000/{{ item }}"
       loop: "{{ images }}"
       changed_when: false
 
