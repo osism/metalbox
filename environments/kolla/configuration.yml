@@ -7,7 +7,15 @@ kolla_enable_tls_internal: "no"
 
 openstack_service_workers: 2
 
+enable_cinder: "no"
+enable_fluentd: "no"
+enable_glance: "no"
+enable_horizon: "no"
 enable_ironic: "yes"
+enable_keepalived: "no"
+enable_neutron: "no"
+enable_nova: "no"
+enable_proxysql: "no"
 
 om_enable_rabbitmq_high_availability: false
 om_enable_rabbitmq_quorum_queues: false
