@@ -31,6 +31,7 @@ manager_listener_broker_uri: "{% for host in manager_listener_broker_hosts %}amq
 
 netbox_enable: true
 netbox_host: 192.168.42.10
+netbox_service_netbox_start_period: 300s
 netbox_api_url: "http://{{ netbox_host }}:8121"
 
 ##########################################################

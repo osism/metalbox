@@ -3,3 +3,4 @@
 # netbox
 
 netbox_host: 192.168.42.10
+netbox_service_netbox_start_period: 300s

@@ -35,4 +35,8 @@ images_kolla:
   - kolla-toolbox:2024.2
   - mariadb-clustercheck:2024.2
   - mariadb-server:2024.2
+  - memcached:2024.2
+  - proxysql:2024.2
   - rabbitmq:2024.2
+  - redis-sentinel:2024.2
+  - redis:2024.2
