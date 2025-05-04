@@ -28,3 +28,11 @@ metalbox
 # to do with the general network configuration.
 [network]
 metalbox
+
+# Nodes that serve as controllers for Ceph, so things like the
+# Ceph monitor service run here.
+[ceph-control]
+
+# The storage available in these systems is provided in the
+# form of OSDs for Ceph.
+[ceph-resource]
