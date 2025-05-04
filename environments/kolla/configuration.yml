@@ -19,3 +19,5 @@ enable_proxysql: "no"
 
 om_enable_rabbitmq_high_availability: false
 om_enable_rabbitmq_quorum_queues: false
+
+enable_ironic_agent_download_images: false
