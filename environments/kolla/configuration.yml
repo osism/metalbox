@@ -3,7 +3,9 @@ docker_namespace: kolla
 
 kolla_internal_vip_address: 192.168.42.10
 kolla_internal_fqdn: api.metalbox.osism.xyz
+
 kolla_enable_tls_internal: "no"
+kolla_enable_tls_external: "no"
 
 openstack_service_workers: 2
 
