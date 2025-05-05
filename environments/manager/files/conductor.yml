@@ -1,0 +1,12 @@
+---
+ironic_parameters:
+  driver: redfish
+  driver_info:
+    redfish_username: admin
+    redfish_password: password
+    redfish_address: "https://{{ remote_board_address }}"
+    redfish_system_id: /redfish/v1/Systems/1
+    redfish_verify_ca: False
+    deploy_kernel: ipa.vmlinuz
+    deploy_ramdisk: ipa.initramfs
+  boot_interface: redfish-virtual-media
