@@ -56,6 +56,7 @@
     periodic-daily:
       jobs:
         - ansible-lint
+        - metalbox-mirror-container-images-publish
         - yamllint
     post:
       jobs:
