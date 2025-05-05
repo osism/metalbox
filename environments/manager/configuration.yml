@@ -27,6 +27,15 @@ manager_listener_broker_username: openstack
 manager_listener_broker_uri: "{% for host in manager_listener_broker_hosts %}amqp://{{ manager_listener_broker_username }}:{{ manager_listener_broker_password }}@{{ host }}:5672/{% if not loop.last %};{% endif %}{% endfor %}"
 
 ##########################################################
+# openstack
+
+manager_openstack_os_project_domain_name: Default
+manager_openstack_os_user_domain_name: Default
+manager_openstack_os_project_name: admin
+manager_openstack_os_username: admin
+manager_openstack_os_auth_url: http://api.metalbox.osism.xyz:5000/v3
+
+##########################################################
 # netbox
 
 netbox_enable: true
