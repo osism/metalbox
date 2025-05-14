@@ -3,27 +3,27 @@
     name: SECRET_METALBOX
     data:
       MINIO_ACCESS_KEY: !encrypted/pkcs1-oaep
-        - faa0NzYJ3Nsbw74BnOaZsnKhmmaDR/gl9TWn3rHVnDdHEmhBkXDdgUiva79pEQcCGWX0t
-          QfKyV3RY2MLsmesbiYRB4UMkC4gZMKQj9PQq7fSIjLUfPOzrh9V1FjztdYvJmQgq0dMZM
-          BMzamfjaf0bqeuxhEvL4AYmhaDYeS3OXI6ulXjpk69DX9EcbLyCMm2UlfLdKwPIf0D3OQ
-          JyPtgVLDMrTtiumzJ9UcB9GumORUtbqtRdcPq/+8ls+ULVsauz3nbO44zHseLyMeVxe23
-          fyk2b76psM+Tp1G3lBhTVE3p+1BxuDk8TKhQZoE2ANTc8YZr/V3aR9BCce01UOvatycfv
-          w71MdspoZ0IpoXH5gv9vw3QAf8b79I0DFO5f0JdncjlaZ+iPKUmhDE9X3qfUZ1RfyqErg
-          U5Qm+WH2T9yXawoCjleGec8WzbZMs4TWAJtsoD8aKG7j1gtpqO7s0UuYV8jnwBuy6REeL
-          jCGDPc+xMjJ+w1WqZHsbPiIFo5MKs/+IMVWp37jaw7/qJ69vghy1PeKs8duCMLXBI5hjl
-          4OVWoA5NG/WgR58rUhIapFNw7y7eNFSVzmV7a3Aghcm9za7nVSEKjiPiufZONNBZaWDkL
-          6YRnPzQQ/8Qva4y4BZsbkKKv9u12FH8Z8iNC8MlziVhEuwKVzlEIt1WuFjpHY0=
+        - XO/tgKCTMPTgoBRprzOlwfXCdkahZF+GhoYfsp6iNJs0PItl+SIqGtTUkF9/XSS/yj1TG
+          VR8IcTKR/vMhScE/cXCHZsZzPXlsizOo4s+5OMWoOYpm3JRZ5aF4uVUbiaeJCwKvh6r+v
+          Tjwbcm+1WHlihAy+C71sxXyW7pU7bzknGsgn8FqgBJw5fH/mjGanaQxu19/RNNWX98nqw
+          rXfRf4h9enDMOyU3BNcFusDbNgTrufGLN4t9y45g3BC8Ipu20Ns4AEUwM8U309HYsEFUB
+          +Iz/eGcTu0GOU+H7OO/2gmXKrrkr6FjnhSj9s6u+47XAjqb6325TfHuoSOCP8TAlqMeV7
+          LKRr2WSKQWKItrMnURNOY1xoivLZqVkI5oT3RBmD0suuq3BkAKM9fCqnbpuJFx4vzR0Oy
+          tC4GDWZV7N+5QRZFqG5E52iZPtxKYkzgM1dy0FpwB01BDOtAdJwjzHjXIPYi4eCCHvvRM
+          9hHhvIJvgWAV+oqvJ6tDp1vLKMWI5IOoLlQGjqggbilLUr7lAq4szR0p/ZVZwsO7WjH8w
+          fKdNnDz3KlzHzntkSY6WzAN/0/sSVorlZ4b1xOC6nvLlQ4VgFaC6wkBJgc7aIgAVtaewk
+          kXHMBckI5i25oCNXddFxOlkaH5DIOXtJYhsPJ4xr45qyHBp6A/WtTueQgqqG24=
       MINIO_SECRET_KEY: !encrypted/pkcs1-oaep
-        - kRs8EUzlNs8a6/Tkk0hxTEOqxB4k+cZtAUjn6y/9ZaNjkjJEy/n9F+FeOlhtwi7gLBY8v
-          DlUQAK2AJcZonN4uC0isTip7oG+siDWiFBkuED7AeW6J93mok3fwAlJwH2Y7ULjtuFDhS
-          fYe/uzunbMrScbU9uMJi0wDTI8qbPHY7F39l97fFQzkNYM2e1RdkxG6/xj4qsrVUIh7Ui
-          PdnTii1vghlhpmGyxoos6wvekQ66ZRFfWZHu5vHSzFwc4oDEP76TCQx1ue5vqjH5gQO0v
-          cBQmWb27EU4D5U8V58UhsnXLIUf/qwU9tjAmf84fZqjo854rxx3HJ2QfVIWJgT7Zdoajx
-          pOUnHlgcQmUeDvUUHMpjnwFVGBY6ifh0CJd46KDzeNZz6j8t8mkBxJdhjblqQk+rfsUVD
-          J6kYASLVq0aYPhRyqm11XvWy0WLRjDZ/GlOGpzXtA2KeCWoOln3J5imF4QZasCQbU/n1P
-          PrQo9POC/sFtW99B4TLvfgL1N4hGDlibmMQf6Ay3QBThP2PEJbnvthrmOW6oYu0QsrIgU
-          NAFPhdMfF/hmCSUp5QLgOgu8Hf9+QS05V20Z3KPc5j1BAT2DnRJ60bUEzdd8SkNWlPAi0
-          Kt2bPK4K5S1JfDWYwFqZJrrzeblzBSsnJTZ0t5KFQmmHwd6KCP4le6+ur+ik/A=
+        - OeSiOVO69mC8uuwUkhqp0Zg67Pov1Lnf0RTQt6YjpTftlkqEV283fhnFHPhAhlkZQ6460
+          Sv9aV/hBSBMJ/JqkB8UAdAWpNCddEZ9c3QTCgdNPTDEoRheD02IbLbdeShU350pKC48rN
+          lQsmNVqHaK9yGUfzo/OXdmY3lAn6oOltNwS+E3NP1nQb4NP0pcY60s5YOaMB/noJVqNEd
+          ui1QtFPjdrWFEHLml8/IqvbdecuuNb79NSpeacaLU6FX/P85Kplv9IvR9LLWcRs0pV+zF
+          d8XlfcSqudhIFCHgedfuNQU9ZpDREBkz7jSrsTRrq5WmZCTZWpK0Lyq/ei9OprlZOccDZ
+          trTK/JLZlXGS0MebvtQfMnzWgrTSv1wJCCGqHTDd8HXGVBJ+i94jfPRiidmTHsiM/pstF
+          HgcA4H6c09MG+h0ncvKDGmiV6l2foeqHPCKvsKk/vCN2ic/xuArfpyMuBFUCJJH8lqTOz
+          VyWqZjcj4WEI0ZwKWALnFcsOY/96cbwdKCDFLDd60k7AlAdUsFxl/FdSf+tjwVeOhs1dd
+          uE1Rin1JCQCE00i+hvC9ovHqCYimXaxYJYzttIt98XPmziHPqeOMgr1aPX1ggx9v8xeMo
+          DJ2hwwTByFI0y6ReXVc4eLUjmyWfavaVEKPMXCHLkVjB+jW1x1SPMyUH6k2dT8=
 
 - job:
     name: metalbox-mirror-container-images
