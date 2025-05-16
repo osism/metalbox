@@ -6,6 +6,7 @@
     - vars/container-images.yml
 
   vars:
+    docker_registry: registry.osism.tech
     _publish: "{{ publish | default(False) }}"
 
   tasks:
@@ -25,19 +26,19 @@
 
     - name: Copy images
       ansible.builtin.command:
-        cmd: "skopeo copy --dest-tls-verify=false docker://registry.osism.tech/dockerhub/{{ item }} docker://localhost:5000/{{ item }}"
+        cmd: "skopeo copy --dest-tls-verify=false docker://{{ docker_registry }}/dockerhub/{{ item }} docker://localhost:5000/{{ item }}"
       loop: "{{ images }}"
       changed_when: false
 
     - name: Copy manager images
       ansible.builtin.command:
-        cmd: "skopeo copy --dest-tls-verify=false docker://registry.osism.tech/osism/{{ item }} docker://localhost:5000/osism/{{ item }}"
+        cmd: "skopeo copy --dest-tls-verify=false docker://{{ docker_registry }}/osism/{{ item }} docker://localhost:5000/osism/{{ item }}"
       loop: "{{ images_manager }}"
       changed_when: false
 
     - name: Copy kolla images
       ansible.builtin.command:
-        cmd: "skopeo copy --dest-tls-verify=false docker://registry.osism.tech/kolla/{{ item }} docker://localhost:5000/kolla/{{ item }}"
+        cmd: "skopeo copy --dest-tls-verify=false docker://{{ docker_registry }}/kolla/{{ item }} docker://localhost:5000/kolla/{{ item }}"
       loop: "{{ images_kolla }}"
       changed_when: false
 
