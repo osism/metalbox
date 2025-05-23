@@ -47,6 +47,8 @@ netbox_role_mapping: {}
 netbox_data_types:
   - primary_ip
 
+manager_inventory_from_netbox: true
+
 ##########################################################
 # configuration
 
