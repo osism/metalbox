@@ -43,6 +43,10 @@ netbox_host: 192.168.42.10
 netbox_service_netbox_start_period: 300s
 netbox_api_url: "http://{{ netbox_host }}:8121"
 
+netbox_role_mapping: {}
+netbox_data_types:
+  - primary_ip
+
 ##########################################################
 # configuration
 
