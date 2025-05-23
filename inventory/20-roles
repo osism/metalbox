@@ -11,7 +11,6 @@ metalbox
 # Nodes which are intended for monitoring services belong to
 # this group
 [monitoring]
-metalbox
 
 # Nodes that serve as controllers, so things like scheduler,
 # API or database run there, of the environment.
@@ -21,13 +20,11 @@ metalbox
 # Virtual systems managed by OpenStack Nova are placed on
 # nodes in this group.
 [compute]
-metalbox
 
 # Network resources managed by OpenStack Neutron, Octavia and Designate,
 # such as routers, are placed on these nodes. This group has nothing
 # to do with the general network configuration.
 [network]
-metalbox
 
 # Nodes that serve as controllers for Ceph, so things like the
 # Ceph monitor service run here.
