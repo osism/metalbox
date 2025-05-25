@@ -46,6 +46,7 @@ netbox_api_url: "http://{{ netbox_host }}:8121"
 netbox_role_mapping: {}
 netbox_data_types:
   - primary_ip
+  - netplan_parameters
 
 manager_inventory_from_netbox: true
 manager_inventory_reconciler_mode: metalbox
