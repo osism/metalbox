@@ -52,6 +52,12 @@ manager_inventory_from_netbox: true
 manager_inventory_reconciler_mode: metalbox
 
 ##########################################################
+# schedules
+
+manager_inventory_reconciler_schedule: 0
+manager_gather_facts_schedule: 0
+
+##########################################################
 # configuration
 
 configuration_git_version: main
