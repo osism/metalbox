@@ -8,7 +8,6 @@ openstack_version: 2024.2
 ##########################################################
 # services
 
-enable_ara: false
 enable_ceph_ansible: false
 enable_osism_kubernetes: false
 enable_vault: false
