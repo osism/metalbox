@@ -3,7 +3,7 @@
 # dnsmasq
 
 dnsmasq_dhcp_options:
-  - tag:edgecore,114,http://192.168.42.10/sonic/sonic-broadcom-enterprise-base-4.4.2.bin
+  - tag:edgecore,114,http://metalbox/sonic/sonic-broadcom-enterprise-base-4.4.2.bin
 
 ##########################################################
 # httpd
