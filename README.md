@@ -17,7 +17,6 @@
 
    ```
    osism apply common
-   osism apply loadbalancer
    osism apply redis
    osism apply memcached
    osism apply rabbitmq
