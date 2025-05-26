@@ -78,16 +78,6 @@
         - _publish | bool
         - result.stat.exists
 
-    # - name: Run build script
-    #   ansible.builtin.shell:
-    #     executable: /bin/bash
-    #     cmd: |
-    #       set -e
-    #       set -x
-    #
-    #       docker build -t registry.osism.tech/osism/metalbox:2024.2 -f {{ zuul.project.src_dir }}/zuul/files/Dockerfile .
-    #   changed_when: false
-
     - name: Run upload script
       ansible.builtin.shell:  # noqa command-instead-of-module
         executable: /bin/bash
