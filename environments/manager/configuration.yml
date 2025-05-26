@@ -43,10 +43,22 @@ netbox_host: 192.168.42.10
 netbox_service_netbox_start_period: 300s
 netbox_api_url: "http://{{ netbox_host }}:8121"
 
+netbox_filter_conductor:
+  - state: active
+    site: Discworld
+    tag:
+      - managed-by-ironic
+netbox_filter_inventory:
+  - state: active
+    site: Discworld
+    tag:
+      - managed-by-osism
 netbox_role_mapping: {}
 netbox_data_types:
-  - primary_ip
+  - dnsmasq_parameters
+  - frr_parameters
   - netplan_parameters
+  - primary_ip
 
 manager_inventory_from_netbox: true
 manager_inventory_reconciler_mode: metalbox
