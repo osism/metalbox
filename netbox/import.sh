@@ -28,9 +28,13 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Sync files using rsync with delete option
+# Sync files using rsync with delete option, excluding specific files
 echo "Syncing files to netbox directory..."
-rsync -av --delete "$TEMP_DIR/" "$SCRIPT_DIR/"
+rsync -av --delete \
+    --exclude='import.sh' \
+    --exclude='manage.sh' \
+    --exclude='settings.toml' \
+    "$TEMP_DIR/" "$SCRIPT_DIR/"
 
 if [ $? -eq 0 ]; then
     echo "Successfully synced files from $TARBALL"
