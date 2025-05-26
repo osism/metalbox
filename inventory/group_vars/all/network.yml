@@ -1,22 +1,5 @@
 ---
-network_ethernets:
-  eth*:
-    dhcp4: no
-    dhcp6: no
-    link-local: [ipv6]
-  en*:
-    dhcp4: no
-    dhcp6: no
-    link-local: [ipv6]
-  enp*:
-    dhcp4: no
-    dhcp6: no
-    link-local: [ipv6]
-  eno*:
-    dhcp4: no
-    dhcp6: no
-    link-local: [ipv6]
-
+network_ethernets: {}
 network_dummy_devices:
   metalbox:
     addresses:
