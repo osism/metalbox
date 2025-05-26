@@ -6,11 +6,12 @@
    and transfer it to `/opt/netbox-export.tar.gz`
 4. Run the `import.sh` script in `/opt/configuration/netbox`
 5. Deploy the NetBox service with `./run.sh netbox` in `/opt/configuration/environments/manager`
-6. Deploy the Manager service with `./run.sh manager` in `/opt/configuration/environments/manager`
-7. Sync inventory with `osism sync inventory`
-8. Sync `/etc/hosts` with `osism apply hosts`
-9. Sync facts with `osism apply facts`
-10. Deploy the infrastructure services
+6. Run the `manage.sh` script in `/opt/configuration/netbox`
+7. Deploy the Manager service with `./run.sh manager` in `/opt/configuration/environments/manager`
+8. Sync inventory with `osism sync inventory`
+9. Sync `/etc/hosts` with `osism apply hosts`
+10. Sync facts with `osism apply facts`
+11. Deploy the infrastructure services
 
    ```
    osism apply common
@@ -23,10 +24,10 @@
    osism apply httpd
    ```
 
-11. Transfer the `sonic-broadcom-enterprise-base.bin` file to
+12. Transfer the `sonic-broadcom-enterprise-base.bin` file to
     `/opt/httpd/data/sonic-broadcom-enterprise-base.bin`
 
-12. Copy required Ironic image files
+13. Copy required Ironic image files
 
    ```
    docker exec osism-ansible mkdir -p /share/ironic/ironic
@@ -34,7 +35,7 @@
    docker cp  /opt/ironic-agent.kernek osisim-ansible:/share/ironic/ironic/ironic-agent.kernel
    ```
 
-13. Deploy the OpenStack services
+14. Deploy the OpenStack services
 
    ```
    osism apply keystone
@@ -42,4 +43,4 @@
    osism apply openstackclient
    ```
 
-14. Sync baremetal nodes with `osism sync ironic`
+15. Sync baremetal nodes with `osism sync ironic`
