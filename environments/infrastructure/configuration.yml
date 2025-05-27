@@ -2,6 +2,7 @@
 ##########################################################
 # dnsmasq
 
+dnsmasq_enable_dns: true
 dnsmasq_dhcp_options:
   - tag:edgecore,114,http://metalbox/sonic/sonic-broadcom-enterprise-base-4.4.2.bin
 
