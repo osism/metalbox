@@ -22,6 +22,7 @@ images_manager:
 
 images_kolla:
   - cron:2024.2
+  - glance-api:2024.2
   - ironic-api:2024.2
   - ironic-conductor:2024.2
   - ironic-inspector:2024.2

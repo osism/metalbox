@@ -40,8 +40,15 @@
 
    ```
    osism apply keystone
+   osism apply glance
    osism apply ironic
    osism apply openstackclient
    ```
 
-17. Sync baremetal nodes with `osism sync ironic`
+17. Upload required Ironic image files
+
+   ```
+   osism apply -e custom ironic-upload-images
+   ```
+
+18. Sync baremetal nodes with `osism sync ironic`

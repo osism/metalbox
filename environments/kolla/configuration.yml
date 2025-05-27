@@ -11,7 +11,6 @@ openstack_service_workers: 2
 
 enable_cinder: "no"
 enable_fluentd: "no"
-enable_glance: "no"
 enable_horizon: "no"
 enable_ironic: "yes"
 enable_keepalived: "no"
