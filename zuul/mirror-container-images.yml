@@ -7,6 +7,7 @@
 
   vars:
     docker_registry: registry.osism.tech
+    minio_url: https://swift.services.a.regiocloud.tech
     _publish: "{{ publish | default(False) }}"
 
   tasks:
@@ -84,7 +85,7 @@
         cmd: |
           wget https://dl.min.io/client/mc/release/linux-amd64/mc
           chmod +x mc
-          ./mc alias set minio https://swift.services.a.regiocloud.tech {{ minio.MINIO_ACCESS_KEY | trim }} {{ minio.MINIO_SECRET_KEY | trim }}
+          ./mc alias set minio {{ minio_url }} {{ minio.MINIO_ACCESS_KEY | trim }} {{ minio.MINIO_SECRET_KEY | trim }}
           sha256sum registry.tar.bz2 registry.tar.bz2.CHECKSUM
           ./mc cp registry.tar.bz2.CHECKSUM minio/metalbox
           ./mc cp registry.tar.bz2 minio/metalbox
