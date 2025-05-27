@@ -7,6 +7,6 @@ ironic_parameters:
     redfish_address: "https://{{ remote_board_address }}"
     redfish_system_id: /redfish/v1/Systems/1
     redfish_verify_ca: False
-    deploy_kernel: ipa.vmlinuz
-    deploy_ramdisk: ipa.initramfs
+    deploy_kernel: ironic-agent-kernel
+    deploy_ramdisk: ironic-agent-initramfs
   boot_interface: redfish-virtual-media
