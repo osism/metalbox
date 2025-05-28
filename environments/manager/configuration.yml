@@ -18,6 +18,11 @@ enable_vault: false
 osism_api_host: 192.168.42.10
 
 ##########################################################
+# ara-server
+
+ara_server_host: 192.168.42.10
+
+##########################################################
 # broker
 
 manager_listener_broker_hosts:
