@@ -3,10 +3,12 @@
 ## Installation
 
 1. Download the metalbox image from the well known URL
-2. Write the metalbox image to the disk and boot it (initial boot takes some time)
-3. Export your NetBox configuration repository with `netbox-manager export-archive`
-   and transfer it to `/opt/netbox-export.tar.gz`
-4. Run the `/opt/configuration/scripts/netbox-import.sh` script
+2. Write the metalbox image with the help of grml to the first disk
+   and boot it (initial boot takes some time)
+3. Export your NetBox configuration repository with `netbox-manager export-archive -i`
+   and add it as vHDD / virtual media
+4. Run the `/opt/configuration/scripts/netbox-import.sh` script (afterwards the vHDD / virtual
+   media can be removed)
 5. Run the `/opt/configuration/scripts/deploy-netbox.sh` script
 6. Run the `/opt/configuration/scripts/netbox-manage.sh` script
 7. Adjust the NetBox site in `/opt/configuration/environments/manager/configuration.yml`
