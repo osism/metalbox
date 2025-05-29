@@ -1,14 +1,16 @@
 # metalbox
 
+## Installation
+
 1. Download the metalbox image from the well known URL
 2. Write the metalbox image to the disk and boot it (initial boot takes some time)
-3. Export your NetBox configuration repository with `netbox-manager export`
+3. Export your NetBox configuration repository with `netbox-manager export-archive`
    and transfer it to `/opt/netbox-export.tar.gz`
-4. Run the `import.sh` script in `/opt/configuration/netbox`
-5. Deploy the NetBox service with `./run.sh netbox` in `/opt/configuration/environments/manager`
-6. Run the `manage.sh` script in `/opt/configuration/netbox`
+4. Run the `/opt/configuration/scripts/netbox-import.sh` script
+5. Run the `/opt/configuration/scripts/deploy-netbox.sh` script
+6. Run the `/opt/configuration/scripts/netbox-manage.sh` script
 7. Adjust the NetBox site in `/opt/configuration/environments/manager/configuration.yml`
-8. Deploy the Manager service with `./run.sh manager` in `/opt/configuration/environments/manager`
+8. Run the `/opt/configuration/scripts/deploy-manager.sh` script
 9. Sync inventory with `osism sync inventory`
 10. Sync `/etc/hosts` with `osism apply hosts`
 11. Prepare network configuration with `osism apply network` and apply it with `sudo netplan apply`
