@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#
-# SPDX-License-Identifier: Apache-2.0
 
+pushd /opt/configuration/netbox
 netbox-manager run
+popd
