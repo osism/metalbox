@@ -6,12 +6,12 @@
 2. Write the metalbox image with the help of grml to the first disk
    and boot it (initial boot takes some time)
 3. Export your NetBox configuration repository with `netbox-manager export-archive -i`
-   and add it as vHDD / virtual media
+   and use it as vHDD / virtual media
 4. Run the `/opt/configuration/scripts/netbox-import.sh` script (afterwards the vHDD / virtual
    media can be removed)
 5. Run the `/opt/configuration/scripts/deploy-netbox.sh` script
 6. Run the `/opt/configuration/scripts/netbox-manage.sh` script
-7. Adjust the NetBox site in `/opt/configuration/environments/manager/configuration.yml`
+7. Set the managed site with the `/opt/configuration/scripts/netbox-site.sh` script
 8. Run the `/opt/configuration/scripts/deploy-manager.sh` script
 9. Sync inventory with `osism sync inventory`
 10. Sync `/etc/hosts` with `osism apply hosts`
