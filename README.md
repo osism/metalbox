@@ -37,9 +37,7 @@
     osism apply dnsmasq
     ```
 
-16. Run the `/opt/configuration/scripts/ironic-import.sh` script
-
-17. Deploy the OpenStack services
+16. Deploy the OpenStack services
 
     ```
     osism apply keystone
@@ -48,10 +46,10 @@
     osism apply openstackclient
     ```
 
-18. Upload required Ironic image files
+17. Upload required Ironic image files
 
     ```
     osism apply -e custom ironic-upload-images
     ```
 
-19. Sync baremetal nodes with `osism sync ironic`
+18. Sync baremetal nodes with `osism sync ironic`
