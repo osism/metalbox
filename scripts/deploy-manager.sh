@@ -20,3 +20,5 @@ bash run.sh manager
 popd
 
 wait_for_container_healthy
+
+bash -c /opt/configuration/scripts/ironic-import.sh
