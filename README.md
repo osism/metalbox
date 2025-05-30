@@ -15,7 +15,7 @@
 8. Run the `/opt/configuration/scripts/deploy-manager.sh` script
 9. Sync inventory with `osism sync inventory`
 10. Sync `/etc/hosts` with `osism apply hosts`
-11. Prepare network configuration with `osism apply network` and apply it with `sudo netplan apply`
+11. Sync network configuration with `osism apply network`
 12. Sync facts with `osism apply facts`
 13. Deploy the infrastructure services
 
