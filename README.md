@@ -32,13 +32,7 @@
 14. Transfer the `sonic-broadcom-enterprise-base.bin` file to
     `/opt/httpd/data/sonic-broadcom-enterprise-base.bin`
 
-15. Copy required Ironic image files
-
-   ```
-   docker exec osism-ansible mkdir -p /share/ironic/ironic
-   docker cp  /opt/ironic-agent.initramfs osism-ansible:/share/ironic/ironic/ironic-agent.initramfs
-   docker cp  /opt/ironic-agent.kernel osism-ansible:/share/ironic/ironic/ironic-agent.kernel
-   ```
+15. Run the `/opt/configuration/scripts/ironic-import.sh` script
 
 16. Deploy the OpenStack services
 
