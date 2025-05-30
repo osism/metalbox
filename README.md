@@ -19,34 +19,39 @@
 12. Sync facts with `osism apply facts`
 13. Deploy the infrastructure services
 
-   ```
-   osism apply common
-   osism apply redis
-   osism apply memcached
-   osism apply rabbitmq
-   osism apply mariadb
-   osism apply dnsmasq
-   osism apply httpd
-   ```
+    ```
+    osism apply common
+    osism apply redis
+    osism apply memcached
+    osism apply rabbitmq
+    osism apply mariadb
+    osism apply httpd
+    ```
 
 14. Transfer the `sonic-broadcom-enterprise-base.bin` file to
     `/opt/httpd/data/sonic-broadcom-enterprise-base.bin`
 
-15. Run the `/opt/configuration/scripts/ironic-import.sh` script
+15. Deploy the dnsmasq service
 
-16. Deploy the OpenStack services
+    ```
+    osism apply dnsmasq
+    ```
 
-   ```
-   osism apply keystone
-   osism apply glance
-   osism apply ironic
-   osism apply openstackclient
-   ```
+16. Run the `/opt/configuration/scripts/ironic-import.sh` script
 
-17. Upload required Ironic image files
+17. Deploy the OpenStack services
 
-   ```
-   osism apply -e custom ironic-upload-images
-   ```
+    ```
+    osism apply keystone
+    osism apply glance
+    osism apply ironic
+    osism apply openstackclient
+    ```
 
-18. Sync baremetal nodes with `osism sync ironic`
+18. Upload required Ironic image files
+
+    ```
+    osism apply -e custom ironic-upload-images
+    ```
+
+19. Sync baremetal nodes with `osism sync ironic`
