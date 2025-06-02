@@ -19,10 +19,11 @@
 7. Set the managed site with the `/opt/configuration/scripts/netbox-site.sh` script
 8. Run the `/opt/configuration/scripts/deploy-manager.sh` script
 9. Sync inventory with `osism sync inventory`
-10. Sync `/etc/hosts` with `osism apply hosts`
-11. Sync network configuration with `osism apply network`
-12. Sync facts with `osism apply facts`
-13. Deploy the infrastructure services
+10. Set vault password with `osism vault password set`
+11. Sync `/etc/hosts` with `osism apply hosts`
+12. Sync network configuration with `osism apply network`
+13. Sync facts with `osism apply facts`
+14. Deploy the infrastructure services
 
     ```
     osism apply common
@@ -33,17 +34,17 @@
     osism apply httpd
     ```
 
-14. Download the SONiC export image from the well known URL. Use the file as
+15. Download the SONiC export image from the well known URL. Use the file as
     virtual media (vHDD) and run the `/opt/configuration/scripts/sonic-import.sh`
     script. Afterwards remove the virtual media (vHDD).
 
-15. Deploy the dnsmasq service
+16. Deploy the dnsmasq service
 
     ```
     osism apply dnsmasq
     ```
 
-16. Deploy the OpenStack services
+17. Deploy the OpenStack services
 
     ```
     osism apply keystone
@@ -52,10 +53,10 @@
     osism apply openstackclient
     ```
 
-17. Upload required Ironic image files
+18. Upload required Ironic image files
 
     ```
     osism apply -e custom ironic-upload-images
     ```
 
-18. Sync baremetal nodes with `osism sync ironic`
+19. Sync baremetal nodes with `osism sync ironic`
