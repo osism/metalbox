@@ -9,11 +9,11 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Default filename or use environment variable
-SONIC_FILENAME="${SONIC_FILENAME:-sonic-broadcom-enterprise-base.bin}"
+SONIC_IMAGE="${SONIC_IMAGE:-sonic-broadcom-enterprise-base.bin}"
 # Default destination path or use environment variable
 SONIC_DESTINATION="${SONIC_DESTINATION:-/opt/httpd/data/sonic-broadcom-enterprise-base.bin}"
 
-echo -e "${GREEN}Searching for ${SONIC_FILENAME} on ext4 filesystems...${NC}"
+echo -e "${GREEN}Searching for ${SONIC_IMAGE} on ext4 filesystems...${NC}"
 
 # Get the root filesystem device
 ROOT_DEVICE=$(df / | tail -1 | awk '{print $1}')
@@ -54,15 +54,15 @@ search_on_device() {
     local was_mounted="$3"
 
     # Check if the file exists
-    if [[ -f "${mount_point}/${SONIC_FILENAME}" ]]; then
-        echo -e "${GREEN}Found file: ${mount_point}/${SONIC_FILENAME}${NC}"
-        FOUND_FILE="${mount_point}/${SONIC_FILENAME}"
+    if [[ -f "${mount_point}/${SONIC_IMAGE}" ]]; then
+        echo -e "${GREEN}Found file: ${mount_point}/${SONIC_IMAGE}${NC}"
+        FOUND_FILE="${mount_point}/${SONIC_IMAGE}"
 
         # If we mounted it temporarily, copy the file before unmounting
         if [[ "$was_mounted" == "no" ]]; then
-            cp "${mount_point}/${SONIC_FILENAME}" "/tmp/${SONIC_FILENAME}"
+            cp "${mount_point}/${SONIC_IMAGE}" "/tmp/${SONIC_IMAGE}"
             sudo umount "$mount_point" 2>/dev/null || true
-            FOUND_FILE="/tmp/${SONIC_FILENAME}"
+            FOUND_FILE="/tmp/${SONIC_IMAGE}"
         fi
 
         return 0
@@ -179,7 +179,7 @@ fi
 rmdir "$TEMP_MOUNT_DIR" 2>/dev/null || true
 
 if [[ -z "$FOUND_FILE" ]]; then
-    echo -e "${RED}Error: ${SONIC_FILENAME} not found on any non-root ext4 filesystem${NC}"
+    echo -e "${RED}Error: ${SONIC_IMAGE} not found on any non-root ext4 filesystem${NC}"
     exit 1
 fi
 
@@ -193,7 +193,7 @@ if sudo cp "$FOUND_FILE" "$SONIC_DESTINATION"; then
     echo -e "${GREEN}File copied successfully to ${SONIC_DESTINATION}${NC}"
     
     # Clean up temporary file if we created one
-    if [[ "$FOUND_FILE" == "/tmp/${SONIC_FILENAME}" ]]; then
+    if [[ "$FOUND_FILE" == "/tmp/${SONIC_IMAGE}" ]]; then
         rm -f "$FOUND_FILE"
     fi
     
