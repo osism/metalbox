@@ -13,7 +13,7 @@ SONIC_FILENAME="${SONIC_FILENAME:-sonic-broadcom-enterprise-base.bin}"
 # Default destination path or use environment variable
 SONIC_DESTINATION="${SONIC_DESTINATION:-/opt/httpd/data/sonic-broadcom-enterprise-base.bin}"
 
-echo -e "${GREEN}Searching for ${SONIC_FILENAME} on all filesystems...${NC}"
+echo -e "${GREEN}Searching for ${SONIC_FILENAME} on ext4 filesystems...${NC}"
 
 # Get the root filesystem device
 ROOT_DEVICE=$(df / | tail -1 | awk '{print $1}')
@@ -78,30 +78,23 @@ search_on_device() {
 
 FOUND_FILE=""
 
-# First, check all currently mounted filesystems (any type)
-echo -e "${YELLOW}Checking mounted filesystems...${NC}"
-while read -r device mount_point fstype; do
+# First, check all currently mounted ext4 filesystems
+echo -e "${YELLOW}Checking mounted ext4 filesystems...${NC}"
+while read -r device mount_point; do
     # Skip if it's on the root disk
     if is_root_disk "$device"; then
         continue
     fi
 
-    # Skip special filesystems
-    case "$fstype" in
-        proc|sysfs|devtmpfs|tmpfs|devpts|securityfs|cgroup*|pstore|bpf|tracefs|debugfs|hugetlbfs|mqueue|fusectl|configfs)
-            continue
-            ;;
-    esac
-
-    echo -e "Checking mounted filesystem: $device at $mount_point ($fstype)"
+    echo -e "Checking mounted filesystem: $device at $mount_point"
     if search_on_device "$device" "$mount_point" "yes"; then
         break
     fi
-done < <(findmnt -n -o SOURCE,TARGET,FSTYPE)
+done < <(findmnt -t ext4 -n -o SOURCE,TARGET)
 
-# If not found, check all partitions (mounted and unmounted)
+# If not found, check all ext4 partitions (mounted and unmounted)
 if [[ -z "$FOUND_FILE" ]]; then
-    echo -e "${YELLOW}Checking all partitions (including unmounted)...${NC}"
+    echo -e "${YELLOW}Checking all ext4 partitions (including unmounted)...${NC}"
 
     # Get all block devices that are partitions
     while read -r device; do
@@ -120,23 +113,14 @@ if [[ -z "$FOUND_FILE" ]]; then
             # Not mounted, try to mount temporarily
             echo -e "Checking unmounted partition: $device"
 
-            # Get filesystem type
-            fs_type=$(blkid -o value -s TYPE "$device" 2>/dev/null || lsblk -f -n -o FSTYPE "$device" 2>/dev/null | head -n1)
-            
-            # Skip if no filesystem or unsupported type
-            if [[ -z "$fs_type" ]]; then
+            # Check if it's really ext4
+            fs_type=$(blkid -o value -s TYPE "$device" 2>/dev/null)
+            if [[ "$fs_type" != "ext4" ]]; then
                 continue
             fi
 
-            # Skip special/system filesystems
-            case "$fs_type" in
-                swap|LVM2_member|crypto_LUKS)
-                    continue
-                    ;;
-            esac
-
-            # Try to mount it read-only
-            if sudo mount -o ro "$device" "$TEMP_MOUNT_DIR" 2>/dev/null; then
+            # Try to mount it
+            if sudo mount -t ext4 -o ro "$device" "$TEMP_MOUNT_DIR" 2>/dev/null; then
                 if search_on_device "$device" "$TEMP_MOUNT_DIR" "no"; then
                     break
                 fi
@@ -168,23 +152,14 @@ if [[ -z "$FOUND_FILE" ]]; then
             # Not mounted, try to mount temporarily
             echo -e "Checking block device without partitions: $device"
 
-            # Get filesystem type
+            # Check if it's ext4 using lsblk -f
             fs_type=$(lsblk -f -n -o FSTYPE "$device" 2>/dev/null | head -n1)
-            
-            # Skip if no filesystem or unsupported type
-            if [[ -z "$fs_type" ]]; then
+            if [[ "$fs_type" != "ext4" ]]; then
                 continue
             fi
 
-            # Skip special/system filesystems
-            case "$fs_type" in
-                swap|LVM2_member|crypto_LUKS)
-                    continue
-                    ;;
-            esac
-
-            # Try to mount it read-only
-            if sudo mount -o ro "$device" "$TEMP_MOUNT_DIR" 2>/dev/null; then
+            # Try to mount it
+            if sudo mount -t ext4 -o ro "$device" "$TEMP_MOUNT_DIR" 2>/dev/null; then
                 if search_on_device "$device" "$TEMP_MOUNT_DIR" "no"; then
                     break
                 fi
@@ -204,7 +179,7 @@ fi
 rmdir "$TEMP_MOUNT_DIR" 2>/dev/null || true
 
 if [[ -z "$FOUND_FILE" ]]; then
-    echo -e "${RED}Error: ${SONIC_FILENAME} not found on any non-root filesystem${NC}"
+    echo -e "${RED}Error: ${SONIC_FILENAME} not found on any non-root ext4 filesystem${NC}"
     exit 1
 fi
 
