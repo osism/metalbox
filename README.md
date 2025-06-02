@@ -2,22 +2,21 @@
 
 ## Installation
 
-1. Download the metalbox image from the well known URL
-2. Write the metalbox image with the help of grml to the first disk
-   and boot it (initial boot takes some time)
-3. Export your NetBox configuration repository with `netbox-manager export-archive -i`
-   and use it as vHDD / virtual media
-4. Run the `/opt/configuration/scripts/netbox-import.sh` script (afterwards the vHDD / virtual
-   media can be removed)
-5. Run the `/opt/configuration/scripts/deploy-netbox.sh` script
-6. Run the `/opt/configuration/scripts/netbox-manage.sh` script
-7. Set the managed site with the `/opt/configuration/scripts/netbox-site.sh` script
-8. Run the `/opt/configuration/scripts/deploy-manager.sh` script
-9. Sync inventory with `osism sync inventory`
-10. Sync `/etc/hosts` with `osism apply hosts`
-11. Sync network configuration with `osism apply network`
-12. Sync facts with `osism apply facts`
-13. Deploy the infrastructure services
+1. Download the metalbox image from the well known URL use it as vHDD / virtual media
+2. Write the metalbox image with the help of Grml to the first disk (afterwards remove
+   the vHDD / virtual media) and boot it
+3. Export your NetBox configuration repository with `netbox-manager export-archive -i`,
+   use it as vHDD / virtual media and run the `/opt/configuration/scripts/netbox-import.sh`
+   script (afterwards remove the vHDD / virtual media)
+4. Run the `/opt/configuration/scripts/deploy-netbox.sh` script
+5. Run the `/opt/configuration/scripts/netbox-manage.sh` script
+6. Set the managed site with the `/opt/configuration/scripts/netbox-site.sh` script
+7. Run the `/opt/configuration/scripts/deploy-manager.sh` script
+8. Sync inventory with `osism sync inventory`
+9. Sync `/etc/hosts` with `osism apply hosts`
+10. Sync network configuration with `osism apply network`
+11. Sync facts with `osism apply facts`
+12. Deploy the infrastructure services
 
     ```
     osism apply common
@@ -28,16 +27,17 @@
     osism apply httpd
     ```
 
-14. Transfer the `sonic-broadcom-enterprise-base.bin` file to
-    `/opt/httpd/data/sonic-broadcom-enterprise-base.bin`
+13. Download the SONiC import image from the well known URL, use it as vHDD / virtual
+    media and run the `/opt/configuration/scripts/sonic-import.sh` script (afterwards
+    remove the vHDD / virtual media)
 
-15. Deploy the dnsmasq service
+14. Deploy the dnsmasq service
 
     ```
     osism apply dnsmasq
     ```
 
-16. Deploy the OpenStack services
+15. Deploy the OpenStack services
 
     ```
     osism apply keystone
@@ -46,10 +46,10 @@
     osism apply openstackclient
     ```
 
-17. Upload required Ironic image files
+16. Upload required Ironic image files
 
     ```
     osism apply -e custom ironic-upload-images
     ```
 
-18. Sync baremetal nodes with `osism sync ironic`
+17. Sync baremetal nodes with `osism sync ironic`
