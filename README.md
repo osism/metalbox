@@ -27,8 +27,8 @@
     osism apply httpd
     ```
 
-13. Download the SONiC import image from the well known URL, use it as vHDD / virtual
-    media and run the `/opt/configuration/scripts/sonic-import.sh` script (afterwards
+13. Download the SONiC image from the well known URL, use it as vHDD / virtual media
+    and run the `/opt/configuration/scripts/sonic-import.sh` script (afterwards
     remove the vHDD / virtual media)
 
 14. Deploy the dnsmasq service
