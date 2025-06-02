@@ -23,15 +23,23 @@ osism_api_host: 192.168.42.10
 ara_server_host: 192.168.42.10
 
 ##########################################################
-# manager
+# listener
 
 manager_listener_broker_hosts:
   - 192.168.42.10
 manager_listener_broker_username: openstack
 manager_listener_broker_uri: "{% for host in manager_listener_broker_hosts %}amqp://{{ manager_listener_broker_username }}:{{ manager_listener_broker_password }}@{{ host }}:5672/{% if not loop.last %};{% endif %}{% endfor %}"
 
+##########################################################
+# manager
+
 manager_service_manual_start: true
 manager_service_allow_restart: false
+
+##########################################################
+# watchdog
+
+manager_enable_watchdog: false
 
 ##########################################################
 # openstack
