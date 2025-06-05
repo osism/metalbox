@@ -2,8 +2,8 @@
 ironic_parameters:
   driver: redfish
   driver_info:
-    redfish_username: admin
-    redfish_password: password
+    redfish_username: "{{ remote_board_username }}"
+    redfish_password: "{{ remote_board_password }}"
     redfish_address: "https://{{ remote_board_address }}"
     redfish_system_id: /redfish/v1/Systems/1
     redfish_verify_ca: False
