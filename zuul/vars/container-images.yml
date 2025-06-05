@@ -1,11 +1,11 @@
 ---
 images:
-  - hashicorp/vault:1.19.0
+  - hashicorp/vault:1.19.5
   - library/httpd:alpine
   - library/mariadb:11.7.2
-  - library/postgres:16.8-alpine
-  - library/redis:7.4.3-alpine
-  - library/traefik:v3.3.5
+  - library/postgres:16.9-alpine
+  - library/redis:7.4.4-alpine
+  - library/traefik:v3.4.1
   - pgautoupgrade/pgautoupgrade:16-alpine
   - ubuntu/squid:6.1-23.10_beta
 
