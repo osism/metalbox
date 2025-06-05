@@ -10,3 +10,5 @@ ironic_parameters:
     deploy_kernel: ironic-agent-kernel
     deploy_ramdisk: ironic-agent-initramfs
   boot_interface: redfish-virtual-media
+  instance_info:
+    image_source: OSISM Node v0.20250605.0
