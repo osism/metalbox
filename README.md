@@ -16,7 +16,8 @@
    Afterwards remove the virtual media (vHDD).
 5. Run the `/opt/configuration/scripts/deploy-netbox.sh` script
 6. Run the `/opt/configuration/scripts/netbox-manage.sh` script
-7. Set the managed site with the `/opt/configuration/scripts/netbox-site.sh` script
+7. Set the managed site by running `/opt/configuration/scripts/netbox-site.sh SITE`
+   (replace `SITE` with the slug name of the site managed by this Metalbox)
 8. Run the `/opt/configuration/scripts/deploy-manager.sh` script
 9. Sync inventory with `osism sync inventory`
 10. Set vault password with `osism vault password set`
