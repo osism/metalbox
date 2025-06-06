@@ -9,20 +9,33 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Default values or use environment variables
-SONIC_IMAGE="${SONIC_IMAGE:-sonic-broadcom-enterprise-base.bin}"
+SONIC_PATTERN="${SONIC_PATTERN:-sonic-broadcom-enterprise-base*.bin}"
 SONIC_EXPORT_SIZE="${SONIC_EXPORT_SIZE:-2G}"
 SONIC_EXPORT_IMAGE="${SONIC_EXPORT_IMAGE:-sonic-export.img}"
 
 echo -e "${GREEN}Creating SONiC export image...${NC}"
-echo -e "Source file: ${SONIC_IMAGE}"
+echo -e "Source pattern: ${SONIC_PATTERN}"
 echo -e "Target image: ${SONIC_EXPORT_IMAGE}"
 echo -e "Image size: ${SONIC_EXPORT_SIZE}"
 
-# Check if source file exists
-if [[ ! -f "$SONIC_IMAGE" ]]; then
-    echo -e "${RED}Error: Source file ${SONIC_IMAGE} not found${NC}"
+# Find files matching the pattern
+FOUND_FILES=()
+for file in ${SONIC_PATTERN}; do
+    if [[ -f "$file" ]]; then
+        FOUND_FILES+=("$file")
+    fi
+done
+
+# Check if any files were found
+if [[ ${#FOUND_FILES[@]} -eq 0 ]]; then
+    echo -e "${RED}Error: No files matching pattern ${SONIC_PATTERN} found${NC}"
     exit 1
 fi
+
+echo -e "${GREEN}Found ${#FOUND_FILES[@]} file(s) matching pattern:${NC}"
+for file in "${FOUND_FILES[@]}"; do
+    echo -e "  - $file"
+done
 
 echo -e "${YELLOW}Creating disk image of size ${SONIC_EXPORT_SIZE}...${NC}"
 if ! dd if=/dev/zero of="$SONIC_EXPORT_IMAGE" bs=1 count=0 seek="$SONIC_EXPORT_SIZE" 2>/dev/null; then
@@ -48,13 +61,17 @@ if ! sudo mount -o loop "$SONIC_EXPORT_IMAGE" "$TEMP_MOUNT_DIR"; then
     exit 1
 fi
 
-echo -e "${YELLOW}Copying ${SONIC_IMAGE} to image...${NC}"
-if ! sudo cp "$SONIC_IMAGE" "$TEMP_MOUNT_DIR/"; then
-    echo -e "${RED}Error: Failed to copy file to image${NC}"
-    sudo umount "$TEMP_MOUNT_DIR"
-    rm -f "$SONIC_EXPORT_IMAGE"
-    exit 1
-fi
+echo -e "${YELLOW}Copying files to image...${NC}"
+for file in "${FOUND_FILES[@]}"; do
+    basename=$(basename "$file")
+    echo -e "  Copying $basename..."
+    if ! sudo cp "$file" "$TEMP_MOUNT_DIR/$basename"; then
+        echo -e "${RED}Error: Failed to copy $basename to image${NC}"
+        sudo umount "$TEMP_MOUNT_DIR"
+        rm -f "$SONIC_EXPORT_IMAGE"
+        exit 1
+    fi
+done
 
 echo -e "${YELLOW}Unmounting image...${NC}"
 sudo umount "$TEMP_MOUNT_DIR"
