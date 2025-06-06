@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 # Default filename or use environment variable
 SONIC_IMAGE="${SONIC_IMAGE:-sonic-broadcom-enterprise-base.bin}"
 # Default destination path or use environment variable
-SONIC_DESTINATION="${SONIC_DESTINATION:-/opt/httpd/data/sonic-broadcom-enterprise-base.bin}"
+SONIC_DESTINATION="${SONIC_DESTINATION:-/opt/httpd/data/sonic/sonic-broadcom-enterprise-base.bin}"
 
 echo -e "${GREEN}Searching for ${SONIC_IMAGE} on ext4 filesystems...${NC}"
 
@@ -187,9 +187,11 @@ echo -e "${YELLOW}Copying file to ${SONIC_DESTINATION}...${NC}"
 
 # Create destination directory if it doesn't exist
 sudo mkdir -p "$(dirname "$SONIC_DESTINATION")"
+sudo chown -R dragon: "$(dirname "$SONIC_DESTINATION")"
 
 # Copy the file to destination
 if sudo cp "$FOUND_FILE" "$SONIC_DESTINATION"; then
+    sudo chown dragon: $SONIC_DESTINATION
     echo -e "${GREEN}File copied successfully to ${SONIC_DESTINATION}${NC}"
     
     # Clean up temporary file if we created one
