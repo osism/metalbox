@@ -64,6 +64,11 @@ netbox_filter_conductor_ironic:
     site: Discworld
     tag:
       - managed-by-ironic
+netbox_filter_conductor_sonic:
+  - state: active
+    site: Discworld
+    tag:
+      - managed-by-metalbox
 netbox_filter_inventory:
   - state: active
     site: Discworld
