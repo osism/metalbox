@@ -170,6 +170,45 @@ if [[ -z "$FOUND_FILE" ]]; then
     done)
 fi
 
+# If still not found, check loopback devices
+if [[ -z "$FOUND_FILE" ]]; then
+    echo -e "${YELLOW}Checking loopback devices...${NC}"
+
+    # Get all loopback devices
+    while read -r loop_device; do
+        # Extract just the device path from losetup output
+        device=$(echo "$loop_device" | awk -F: '{print $1}')
+
+        # Check if already mounted
+        mount_point=$(findmnt -n -o TARGET "$device" 2>/dev/null || true)
+
+        if [[ -n "$mount_point" ]]; then
+            echo -e "Checking mounted loopback device: $device at $mount_point"
+            if search_on_device "$device" "$mount_point" "yes"; then
+                break
+            fi
+        else
+            # Not mounted, try to mount temporarily
+            echo -e "Checking unmounted loopback device: $device"
+
+            # Check if it's ext4
+            fs_type=$(blkid -o value -s TYPE "$device" 2>/dev/null)
+            if [[ "$fs_type" != "ext4" ]]; then
+                continue
+            fi
+
+            # Try to mount it
+            if sudo mount -t ext4 -o ro "$device" "$TEMP_MOUNT_DIR" 2>/dev/null; then
+                if search_on_device "$device" "$TEMP_MOUNT_DIR" "no"; then
+                    break
+                fi
+            else
+                echo -e "  Could not mount $device"
+            fi
+        fi
+    done < <(sudo losetup -a 2>/dev/null || true)
+fi
+
 # Clean up temp directory
 rmdir "$TEMP_MOUNT_DIR" 2>/dev/null || true
 
