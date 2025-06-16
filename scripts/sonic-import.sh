@@ -59,7 +59,7 @@ search_on_device() {
         if [[ -f "$file" ]]; then
             local basename=$(basename "$file")
             echo -e "${GREEN}Found file: $file${NC}"
-            
+
             # If we mounted it temporarily, copy the file before unmounting
             if [[ "$was_mounted" == "no" ]]; then
                 cp "$file" "/tmp/$basename"
@@ -67,7 +67,7 @@ search_on_device() {
             else
                 FOUND_FILES["$file"]="$basename"
             fi
-            
+
             found_any=0
         fi
     done
@@ -179,6 +179,41 @@ if [[ ${#FOUND_FILES[@]} -eq 0 ]]; then
     done)
 fi
 
+# If still not found, check loopback devices
+if [[ ${#FOUND_FILES[@]} -eq 0 ]]; then
+    echo -e "${YELLOW}Checking loopback devices...${NC}"
+
+    # Get all loopback devices
+    while read -r loop_device; do
+        # Extract just the device path from losetup output
+        device=$(echo "$loop_device" | awk -F: '{print $1}')
+
+        # Check if already mounted
+        mount_point=$(findmnt -n -o TARGET "$device" 2>/dev/null || true)
+
+        if [[ -n "$mount_point" ]]; then
+            echo -e "Checking mounted loopback device: $device at $mount_point"
+            search_on_device "$device" "$mount_point" "yes"
+        else
+            # Not mounted, try to mount temporarily
+            echo -e "Checking unmounted loopback device: $device"
+
+            # Check if it's ext4
+            fs_type=$(blkid -o value -s TYPE "$device" 2>/dev/null)
+            if [[ "$fs_type" != "ext4" ]]; then
+                continue
+            fi
+
+            # Try to mount it
+            if sudo mount -t ext4 -o ro "$device" "$TEMP_MOUNT_DIR" 2>/dev/null; then
+                search_on_device "$device" "$TEMP_MOUNT_DIR" "no"
+            else
+                echo -e "  Could not mount $device"
+            fi
+        fi
+    done < <(sudo losetup -a 2>/dev/null || true)
+fi
+
 # Clean up temp directory
 rmdir "$TEMP_MOUNT_DIR" 2>/dev/null || true
 
@@ -197,13 +232,13 @@ sudo chown -R dragon: "$SONIC_DEST_DIR"
 for source_file in "${!FOUND_FILES[@]}"; do
     basename="${FOUND_FILES[$source_file]}"
     destination="${SONIC_DEST_DIR}/${basename}"
-    
+
     echo -e "${YELLOW}Copying $basename to $destination...${NC}"
-    
+
     if sudo cp "$source_file" "$destination"; then
         sudo chown dragon: "$destination"
         echo -e "${GREEN}File copied successfully to $destination${NC}"
-        
+
         # Clean up temporary file if we created one
         if [[ "$source_file" == "/tmp/"* ]]; then
             rm -f "$source_file"
