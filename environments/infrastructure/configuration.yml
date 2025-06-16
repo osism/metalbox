@@ -4,8 +4,10 @@
 
 dnsmasq_enable_dns: true
 dnsmasq_enable_tftp: false
+dnsmasq_dhcp_vendorclass:
+  - set:onie,onie_vendor
 dnsmasq_dhcp_options:
-  - tag:edgecore,114,http://metalbox/sonic/sonic-broadcom-enterprise-base-4.4.2.bin
+  - tag:onie,114,http://metalbox/sonic/sonic-broadcom-enterprise-base-4.4.2.bin
 dnsmasq_dhcp_boot:
   - tag:edgecore,http://metalbox/ztp.json
 
