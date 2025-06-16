@@ -199,7 +199,7 @@ if [[ ${#FOUND_FILES[@]} -eq 0 ]]; then
             echo -e "Checking unmounted loopback device: $device"
 
             # Check if it's ext4
-            fs_type=$(blkid -o value -s TYPE "$device" 2>/dev/null)
+            fs_type=$(sudo blkid -o value -s TYPE "$device" 2>/dev/null)
             if [[ "$fs_type" != "ext4" ]]; then
                 continue
             fi
