@@ -9,7 +9,7 @@ dnsmasq_dhcp_vendorclass:
 dnsmasq_dhcp_options:
   - tag:onie,114,http://metalbox/sonic/sonic-broadcom-enterprise-base-4.4.2.bin
 dnsmasq_dhcp_boot:
-  - tag:edgecore,http://metalbox/ztp.json
+  - tag:edgecore,tag:!onie,http://metalbox/ztp.json
 
 ##########################################################
 # httpd
