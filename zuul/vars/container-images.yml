@@ -19,6 +19,7 @@ images_manager:
   - osism-ansible:latest
   - osism:latest
   - rsync:latest
+  - sonic-vs:latest
 
 images_kolla:
   - cron:2024.2
