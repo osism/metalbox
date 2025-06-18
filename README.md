@@ -14,11 +14,14 @@
    from GitHub after a trigger of the `Run export` action. Use the file  as virtual
    media (vHDD) and run the `/opt/configuration/scripts/netbox-import.sh` script.
    Afterwards remove the virtual media (vHDD).
-5. Run the `/opt/configuration/scripts/deploy-netbox.sh` script
-6. Run the `/opt/configuration/scripts/netbox-manage.sh` script
+5. Run the `/opt/configuration/scripts/deploy-netbox.sh` script to deploy the Netbox
+   service.
+6. Run the `/opt/configuration/scripts/netbox-manage.sh` script to initialise the
+   Netbox service.
 7. Set the managed site by running `/opt/configuration/scripts/netbox-site.sh SITE`
    (replace `SITE` with the slug name of the site managed by this Metalbox)
-8. Run the `/opt/configuration/scripts/deploy-manager.sh` script
+8. Run the `/opt/configuration/scripts/deploy-manager.sh` script to deploy the OSISM
+   manager service.
 9. Sync inventory with `osism sync inventory`
 10. Sync `/etc/hosts` with `osism apply hosts`
 11. Sync network configuration with `osism apply network`
