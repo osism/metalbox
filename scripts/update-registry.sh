@@ -6,20 +6,30 @@ REGISTRY_FILE="${REGISTRY_FILE:-registry.tar.bz2}"
 DOWNLOAD_PATH="${DOWNLOAD_PATH:-/opt}"
 CONTAINER_NAME="${CONTAINER_NAME:-registry}"
 VOLUME_NAME="${VOLUME_NAME:-registry}"
+SKIP_DOWNLOAD="${SKIP_DOWNLOAD:-false}"
 
 set -e
 
-echo "Downloading registry archive from: $REGISTRY_URL"
-echo "Saving to: $DOWNLOAD_PATH/$REGISTRY_FILE"
+# Check if download should be skipped
+if [ "$SKIP_DOWNLOAD" = "true" ]; then
+    echo "SKIP_DOWNLOAD is set to true, skipping download..."
+    if [ ! -f "$DOWNLOAD_PATH/$REGISTRY_FILE" ]; then
+        echo "ERROR: $DOWNLOAD_PATH/$REGISTRY_FILE does not exist and SKIP_DOWNLOAD is true!"
+        exit 1
+    fi
+else
+    echo "Downloading registry archive from: $REGISTRY_URL"
+    echo "Saving to: $DOWNLOAD_PATH/$REGISTRY_FILE"
 
-# Remove existing file if it exists
-if [ -f "$DOWNLOAD_PATH/$REGISTRY_FILE" ]; then
-    echo "Removing existing file: $DOWNLOAD_PATH/$REGISTRY_FILE"
-    sudo rm -f "$DOWNLOAD_PATH/$REGISTRY_FILE"
+    # Remove existing file if it exists
+    if [ -f "$DOWNLOAD_PATH/$REGISTRY_FILE" ]; then
+        echo "Removing existing file: $DOWNLOAD_PATH/$REGISTRY_FILE"
+        sudo rm -f "$DOWNLOAD_PATH/$REGISTRY_FILE"
+    fi
+
+    # Download the registry archive
+    sudo curl -L -o "$DOWNLOAD_PATH/$REGISTRY_FILE" "$REGISTRY_URL"
 fi
-
-# Download the registry archive
-sudo curl -L -o "$DOWNLOAD_PATH/$REGISTRY_FILE" "$REGISTRY_URL"
 
 echo "Stopping existing registry container if running..."
 docker stop "$CONTAINER_NAME" 2>/dev/null || true
