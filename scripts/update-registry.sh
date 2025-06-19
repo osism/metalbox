@@ -10,11 +10,18 @@ SKIP_DOWNLOAD="${SKIP_DOWNLOAD:-false}"
 
 set -e
 
-# Check if download should be skipped
+# Determine tarball path
 if [ "$SKIP_DOWNLOAD" = "true" ]; then
     echo "SKIP_DOWNLOAD is set to true, skipping download..."
-    if [ ! -f "$DOWNLOAD_PATH/$REGISTRY_FILE" ]; then
-        echo "ERROR: $DOWNLOAD_PATH/$REGISTRY_FILE does not exist and SKIP_DOWNLOAD is true!"
+    # Check both locations for the tarball, preferring /home/dragon
+    if [ -f "/home/dragon/$REGISTRY_FILE" ]; then
+        TARBALL_PATH="/home/dragon/$REGISTRY_FILE"
+        echo "Using existing tarball from: $TARBALL_PATH"
+    elif [ -f "$DOWNLOAD_PATH/$REGISTRY_FILE" ]; then
+        TARBALL_PATH="$DOWNLOAD_PATH/$REGISTRY_FILE"
+        echo "Using existing tarball from: $TARBALL_PATH"
+    else
+        echo "ERROR: $REGISTRY_FILE not found in /home/dragon or $DOWNLOAD_PATH and SKIP_DOWNLOAD is true!"
         exit 1
     fi
 else
@@ -29,6 +36,7 @@ else
 
     # Download the registry archive
     sudo curl -L -o "$DOWNLOAD_PATH/$REGISTRY_FILE" "$REGISTRY_URL"
+    TARBALL_PATH="$DOWNLOAD_PATH/$REGISTRY_FILE"
 fi
 
 echo "Stopping existing registry container if running..."
@@ -42,7 +50,10 @@ echo "Creating new registry volume..."
 docker volume create "$VOLUME_NAME"
 
 echo "Extracting registry data to volume..."
-docker run --rm -v "$VOLUME_NAME":/volume -v "$DOWNLOAD_PATH":/import library/alpine:3 sh -c "cd /volume && tar xjf /import/$REGISTRY_FILE"
+# Extract the directory path and filename from TARBALL_PATH
+TARBALL_DIR="$(dirname "$TARBALL_PATH")"
+TARBALL_FILENAME="$(basename "$TARBALL_PATH")"
+docker run --rm -v "$VOLUME_NAME":/volume -v "$TARBALL_DIR":/import:ro library/alpine:3 sh -c "cd /volume && tar xjf /import/$TARBALL_FILENAME"
 
 echo "Starting new registry container..."
 docker run -d -p 127.0.0.1:5000:5000 -v "$VOLUME_NAME":/var/lib/registry --name "$CONTAINER_NAME" --restart always library/registry:3
