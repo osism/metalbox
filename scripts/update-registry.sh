@@ -15,11 +15,11 @@ echo "Saving to: $DOWNLOAD_PATH/$REGISTRY_FILE"
 # Remove existing file if it exists
 if [ -f "$DOWNLOAD_PATH/$REGISTRY_FILE" ]; then
     echo "Removing existing file: $DOWNLOAD_PATH/$REGISTRY_FILE"
-    rm -f "$DOWNLOAD_PATH/$REGISTRY_FILE"
+    sudo rm -f "$DOWNLOAD_PATH/$REGISTRY_FILE"
 fi
 
 # Download the registry archive
-curl -L -o "$DOWNLOAD_PATH/$REGISTRY_FILE" "$REGISTRY_URL"
+sudo curl -L -o "$DOWNLOAD_PATH/$REGISTRY_FILE" "$REGISTRY_URL"
 
 echo "Stopping existing registry container if running..."
 docker stop "$CONTAINER_NAME" 2>/dev/null || true
