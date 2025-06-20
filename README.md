@@ -12,16 +12,13 @@
 4. Export the NetBox configuration repository with `netbox-manager export-archive -i`.
    When using a NetBox configuration repository provided by us, the file can be downloaded
    from GitHub after a trigger of the `Run export` action. Use the file  as virtual
-   media (vHDD) and run the `/opt/configuration/scripts/netbox-import.sh` script.
+   media (vHDD) and run the `netbox-import.sh` script.
    Afterwards remove the virtual media (vHDD).
-5. Run the `/opt/configuration/scripts/deploy-netbox.sh` script to deploy the Netbox
-   service.
-6. Run the `/opt/configuration/scripts/netbox-manage.sh` script to initialise the
-   Netbox service.
-7. Set the managed site by running `/opt/configuration/scripts/netbox-site.sh SITE`
+5. Run the `deploy-netbox.sh` script to deploy the Netbox service.
+6. Run the `netbox-manage.sh` script to initialise the Netbox service.
+7. Set the managed site by running `netbox-site.sh SITE`
    (replace `SITE` with the slug name of the site managed by this Metalbox)
-8. Run the `/opt/configuration/scripts/deploy-manager.sh` script to deploy the OSISM
-   manager service.
+8. Run the `deploy-manager.sh` script to deploy the OSISM manager service.
 9. Sync inventory with `osism sync inventory`
 10. Sync `/etc/hosts` with `osism apply hosts`
 11. Sync network configuration with `osism apply network`
@@ -38,8 +35,8 @@
     ```
 
 14. Download the SONiC export image from the well known URL. Use the file as
-    virtual media (vHDD) and run the `/opt/configuration/scripts/sonic-import.sh`
-    script. Afterwards remove the virtual media (vHDD).
+    virtual media (vHDD) and run the `sonic-import.sh` script. Afterwards remove
+    the virtual media (vHDD).
 
 15. Deploy the dnsmasq service
 
