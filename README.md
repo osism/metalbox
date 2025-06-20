@@ -23,7 +23,18 @@
 10. Sync `/etc/hosts` with `osism apply hosts`
 11. Sync network configuration with `osism apply network`
 12. Sync facts with `osism apply facts`
-13. Deploy the infrastructure services
+13. Download the SONiC export image from the well known URL. Use the file as
+    virtual media (vHDD).
+14. Deploy the SONiC ZTP services. Afterwards remove the virtual media (vHDD).
+
+    ```
+    osism apply httpd
+    sonic-import.sh
+    osism sync sonic
+    osism apply dnsmasq
+    ```
+
+15. Deploy the infrastructure services
 
     ```
     osism apply common
@@ -31,17 +42,6 @@
     osism apply memcached
     osism apply rabbitmq
     osism apply mariadb
-    osism apply httpd
-    ```
-
-14. Download the SONiC export image from the well known URL. Use the file as
-    virtual media (vHDD) and run the `sonic-import.sh` script. Afterwards remove
-    the virtual media (vHDD).
-
-15. Deploy the dnsmasq service
-
-    ```
-    osism apply dnsmasq
     ```
 
 16. Deploy the OpenStack services
