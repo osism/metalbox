@@ -1,0 +1,273 @@
+---
+- name: Build remote board group
+  connection: local
+  hosts: localhost
+  gather_facts: false
+  vars:
+    netbox_api_endpoint: "{{ lookup('env', 'NETBOX_API') }}"
+    netbox_api_token: "{{ lookup('file', '/run/secrets/NETBOX_TOKEN') }}"
+    netbox_api_validate_certs: false
+    vault_secret: "{{ lookup('file', '/opt/configuration/environments/.vault_pass') }}"
+  tasks:
+    - name: Gather NetBox devices
+      loop: "{{ netbox_filter_conductor_ironic }}"
+      vars:
+        string_items: "{{ item | dict2items | selectattr('value', 'string') | items2dict }}"
+        sequence_items: "{{ item | dict2items | rejectattr('value', 'string') | selectattr('value', 'sequence') }}"
+        api_filter: "{{ (sequence_items | map(attribute='key') | zip(sequence_items | map(attribute='value') | map('join', ',')) + string_items | items) | map('join', '=') | join(' ') }}"
+      ansible.builtin.set_fact:
+        netbox_devices: >-
+          {{
+             netbox_devices | default([])
+             +
+             query(
+                 'netbox.netbox.nb_lookup',
+                 'devices',
+                 api_filter=api_filter,
+                 api_endpoint=netbox_api_endpoint,
+                 token=netbox_api_token,
+                 validate_certs=netbox_api_validate_certs
+             )
+             | unique
+          }}
+    - name: Build remote board inventory group
+      ansible.builtin.add_host:
+        name: "{{ item.value.oob_ip.address | ansible.utils.ipaddr('address') }}"
+        groups: remote_boards
+        redfish_password: "{{ item.value.custom_fields.secrets.remote_board_password | ansible.builtin.unvault(vault_secret) }}"
+      loop: "{{ netbox_devices }}"
+      loop_control:
+        label: "{{ item.value.name }}"
+      when: "'oob_ip' in item.value and item.value.oob_ip"
+      changed_when: false
+
+- name: Configure remote board
+  hosts: remote_boards
+  gather_facts: false
+  vars:
+    redfish_user: admin
+    redfish_password: password
+    redfish_default_password: password
+    redfish_scheme: https
+    redfish_basepath: /redfish/v1
+    redfish_validate_certs: false
+    redfish_baseuri: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}"
+  tasks:
+    - name: Update admin password
+      block:  # noqa osism-fqcn
+        - name: Test login with default password
+          delegate_to: localhost
+          register: accounts
+          ansible.builtin.uri:
+            url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/AccountService/Accounts"
+            status_code: 401
+            url_password: "{{ redfish_default_password }}"
+            <<: &uri_defaults
+              return_content: true
+              force_basic_auth: true
+              url_username: "{{ redfish_user }}"
+              validate_certs: "{{ redfish_validate_certs }}"
+      rescue:
+        - name: Get account properties
+          delegate_to: localhost
+          register: accounts_properties
+          # NOTE: I cannot find a way to map attributes with dots ('@odata.id'), so we dance around that using dict2items
+          loop: "{{ accounts.json.Members | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') }}"
+          ansible.builtin.uri:
+            url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ item }}"
+            url_password: "{{ redfish_default_password }}"
+            <<: *uri_defaults
+        - name: Set new redfish password
+          delegate_to: localhost
+          vars:
+            account: "{{ accounts_properties.results | map(attribute='json') | selectattr('UserName', 'equalto', redfish_user) | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | first }}"
+            new_password:
+              Password: "{{ hostvars[inventory_hostname]['redfish_password'] | default(redfish_password) }}"
+          ansible.builtin.uri:
+            url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ account }}"
+            method: PATCH
+            body_format: json
+            body: "{{ new_password | to_json }}"
+            status_code: 200
+            url_password: "{{ redfish_default_password }}"
+            <<: *uri_defaults
+    - name: Get Manager Interface Information
+      delegate_to: localhost
+      register: manager_nic
+      ansible.builtin.uri:
+        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/Managers/CIMC/EthernetInterfaces/NICs"
+        <<: &uri_opts
+          <<: *uri_defaults
+          url_password: "{{ hostvars[inventory_hostname]['redfish_password'] | default(redfish_password) }}"
+    - name: Configure Manager Interface (Disable IPv6)
+      vars:
+        oem_config:
+          Oem:
+            Cisco:
+              IPv6Enabled: false
+      delegate_to: localhost
+      ansible.builtin.uri:
+        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/Managers/CIMC/EthernetInterfaces/NICs"
+        method: PATCH
+        body_format: json
+        body: "{{ oem_config | to_json }}"
+        status_code: 200
+        <<: *uri_opts
+      changed_when: true
+      when: manager_nic.json.Oem.Cisco | dict2items | selectattr('key', 'in', oem_config.Oem.Cisco) | items2dict != oem_config.Oem.Cisco
+    - name: Configure Manager Interface (Disable Dynamic DNS)
+      vars:
+        oem_config:
+          Oem:
+            Cisco:
+              DynamicDNS:
+                Enabled: false
+      delegate_to: localhost
+      ansible.builtin.uri:
+        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/Managers/CIMC/EthernetInterfaces/NICs"
+        method: PATCH
+        body_format: json
+        body: "{{ oem_config | to_json }}"
+        status_code: 200
+        <<: *uri_opts
+      changed_when: true
+      when: manager_nic.json.Oem.Cisco.DynamicDNS | dict2items | selectattr('key', 'in', oem_config.Oem.Cisco.DynamicDNS) | items2dict != oem_config.Oem.Cisco.DynamicDNS
+    - name: Configure Manager Interface (DHCPv4)
+      vars:
+        dhcpv4_config:
+          DHCPv4:
+            DHCPEnabled: true
+            UseDNSServers: true
+      delegate_to: localhost
+      ansible.builtin.uri:
+        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/Managers/CIMC/EthernetInterfaces/NICs"
+        method: PATCH
+        body_format: json
+        body: "{{ dhcpv4_config | to_json }}"
+        status_code: 200
+        <<: *uri_opts
+      changed_when: true
+      when: manager_nic.json.DHCPv4 | dict2items | selectattr('key', 'in', dhcpv4_config.DHCPv4) | items2dict != dhcpv4_config.DHCPv4
+    - name: Get Systems
+      delegate_to: localhost
+      register: systems
+      retries: 12
+      delay: 5
+      ansible.builtin.uri:
+        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/Systems"
+        <<: *uri_opts
+    - name: Get NetworkAdapter information
+      delegate_to: localhost
+      register: nics
+      ansible.builtin.uri:
+        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/Chassis/1/NetworkAdapters"
+        <<: *uri_opts
+    - name: Configure Cisco VIC UCSC-M-V5Q50GV2
+      vars:
+        cisco_vics: "{{ nics.json.Members | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | select('search', 'UCSC-M-V5Q50GV2') | list }}"
+      when: cisco_vics | length > 0
+      block:  # noqa osism-fqcn
+        - name: Get System 1 Power State
+          delegate_to: localhost
+          register: system
+          ansible.builtin.uri:
+            url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ systems.json.Members | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | first }}"
+            <<: *uri_opts
+        - name: Manage System Power
+          block:  # noqa osism-fqcn
+            - name: Power On System
+              delegate_to: localhost
+              when: system.json.PowerState != 'On'
+              vars:
+                payload:
+                  ResetType: "On"
+              ansible.builtin.uri:
+                url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ systems.json.Members | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | first }}/Actions/ComputerSystem.Reset"
+                method: POST
+                body_format: json
+                body: "{{  payload | to_json }}"
+                status_code: 204
+                <<: *uri_opts
+            - name: Get CISCO NetworkAdapter information
+              delegate_to: localhost
+              register: cisco_vics_properties
+              loop: "{{ cisco_vics }}"
+              until: "'Status' in cisco_vics_properties.json and 'State' in cisco_vics_properties.json.Status and cisco_vics_properties.json.Status.State == 'Enabled' and 'Health' in cisco_vics_properties.json.Status and cisco_vics_properties.json.Status.Health == 'OK'"
+              retries: 60
+              delay: 5
+              ansible.builtin.uri:
+                url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ item }}"
+                <<: *uri_opts
+            - name: Configure NetworkAdapter
+              vars:
+                oem_config:
+                  Oem:
+                    Cisco:
+                      VicConfiguration:
+                        AzureQosEnabled: false
+                        FipEnabled: false
+                        LldpEnabled: false
+                        NivEnabled: false
+                        PhysicalNicModeEnabled: true
+                        PortChannelEnabled: false
+                        RweTsoEnabled: false
+              delegate_to: localhost
+              ansible.builtin.uri:
+                url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ item.item }}"
+                method: PATCH
+                body_format: json
+                body: "{{ oem_config | to_json }}"
+                status_code: 201
+                <<: *uri_opts
+              changed_when: true
+              loop: "{{ cisco_vics_properties.results }}"
+              loop_control:
+                label: "{{ item.item }}"
+              when: item.json.Oem.Cisco.VicConfiguration | dict2items | selectattr('key', 'in', oem_config.Oem.Cisco.VicConfiguration) | items2dict != oem_config.Oem.Cisco.VicConfiguration
+            - name: Configure Cisco VIC UCSC-M-V5Q50GV2 Ports
+              vars:
+                cisco_vics_ports: "{{ cisco_vics_properties.results | map(attribute='json.Controllers') | flatten | map(attribute='Links.NetworkPorts') | flatten | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') }}"
+              when: cisco_vics_ports | length > 0
+              block:  # noqa osism-fqcn
+                - name: Get NetworkPort information
+                  delegate_to: localhost
+                  ansible.builtin.uri:
+                    url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ item }}"
+                    <<: *uri_opts
+                  register: cisco_vics_ports_properties
+                  loop: "{{ cisco_vics_ports }}"
+                - name: Configure NetworkPort
+                  vars:
+                    oem_config:
+                      Oem:
+                        Cisco:
+                          VicPort:
+                            AdminFecMode: "Off"
+                            AdminLinkSpeed: "Auto"
+                  delegate_to: localhost
+                  ansible.builtin.uri:
+                    url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ item.item }}"
+                    method: PATCH
+                    body_format: json
+                    body: "{{ oem_config | to_json }}"
+                    status_code: 201
+                    <<: *uri_opts
+                  changed_when: true
+                  loop: "{{ cisco_vics_ports_properties.results }}"
+                  loop_control:
+                    label: "{{ item.item }}"
+                  when: item.json.Oem.Cisco.VicPort | dict2items | selectattr('key', 'in', oem_config.Oem.Cisco.VicPort) | items2dict != oem_config.Oem.Cisco.VicPort
+          always:
+            - name: Power Off System
+              delegate_to: localhost
+              when: system.json.PowerState == 'Off'
+              vars:
+                payload:
+                  ResetType: "ForceOff"
+              ansible.builtin.uri:
+                url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ systems.json.Members | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | first }}/Actions/ComputerSystem.Reset"
+                method: POST
+                body_format: json
+                body: "{{  payload | to_json }}"
+                status_code: 204
+                <<: *uri_opts
