@@ -21,7 +21,7 @@ for LOOP_DEVICE in $LOOP_DEVICES; do
     # Get the backing file for this loop device
     BACKING_FILE=$(sudo losetup -l | grep "^$LOOP_DEVICE" | awk '{print $6}')
     
-    # Check if it's an .img file
+    # Check if it's an .img file (including *-export.img and *-export-*.img)
     if [[ "$BACKING_FILE" == *.img ]]; then
         echo "Unmounting $LOOP_DEVICE (backing file: $BACKING_FILE)"
         if sudo losetup -d "$LOOP_DEVICE"; then
