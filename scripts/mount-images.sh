@@ -11,36 +11,84 @@ fi
 
 echo "Looking for *.img, *-export.img, and *-export-*.img files in: $DIR"
 
-# Find all *.img files in the directory
-IMG_FILES=("$DIR"/*.img)
+# Function to extract prefix from filename
+get_prefix() {
+    local filename="$1"
+    # Extract basename without path
+    local basename=$(basename "$filename")
+
+    # For *-export-*.img files, extract prefix before "-export-"
+    if [[ "$basename" =~ ^(.+)-export-.*\.img$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+    # For *-export.img files, extract prefix before "-export"
+    elif [[ "$basename" =~ ^(.+)-export\.img$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+    # For regular *.img files, extract prefix before ".img"
+    elif [[ "$basename" =~ ^(.+)\.img$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+    else
+        echo "$basename"
+    fi
+}
+
+# Find all image files and group by prefix
+declare -A GROUPED_FILES
+ALL_IMAGE_FILES=()
+
+# Find all *.img files
+if compgen -G "$DIR/*.img" > /dev/null; then
+    mapfile -t IMG_FILES < <(find "$DIR" -name "*.img")
+    ALL_IMAGE_FILES+=("${IMG_FILES[@]}")
+fi
 
 # Find all *-export.img files
-EXPORT_IMG_FILES=("$DIR"/*-export.img)
+if compgen -G "$DIR/*-export.img" > /dev/null; then
+    mapfile -t EXPORT_IMG_FILES < <(find "$DIR" -name "*-export.img")
+    ALL_IMAGE_FILES+=("${EXPORT_IMG_FILES[@]}")
+fi
 
-# Find all *-export-*.img files and sort them by version/date
-EXPORT_VERSIONED_FILES=()
+# Find all *-export-*.img files
 if compgen -G "$DIR/*-export-*.img" > /dev/null; then
-    # Get all export files and sort by version/date (newest first)
-    mapfile -t EXPORT_VERSIONED_FILES < <(find "$DIR" -name "*-export-*.img" -printf '%f\n' | sort -V -r | head -1 | xargs -I {} find "$DIR" -name "{}")
+    mapfile -t EXPORT_VERSIONED_FILES < <(find "$DIR" -name "*-export-*.img")
+    ALL_IMAGE_FILES+=("${EXPORT_VERSIONED_FILES[@]}")
 fi
 
-# Combine all file types
+# Group files by prefix and keep only the newest version for each group
+for file in "${ALL_IMAGE_FILES[@]}"; do
+    if [ -f "$file" ]; then
+        prefix=$(get_prefix "$file")
+        basename_file=$(basename "$file")
+
+        # If this is the first file for this prefix, or if it's newer than the current one
+        if [ -z "${GROUPED_FILES[$prefix]}" ]; then
+            GROUPED_FILES[$prefix]="$file"
+        else
+            current_basename=$(basename "${GROUPED_FILES[$prefix]}")
+            # Use version sort to determine which is newer
+            if [[ $(printf '%s\n%s\n' "$current_basename" "$basename_file" | sort -V -r | head -1) == "$basename_file" ]]; then
+                GROUPED_FILES[$prefix]="$file"
+            fi
+        fi
+    fi
+done
+
+# Create final file list from grouped files
 ALL_FILES=()
-if [ -e "${IMG_FILES[0]}" ]; then
-    ALL_FILES+=("${IMG_FILES[@]}")
-fi
-if [ -e "${EXPORT_IMG_FILES[0]}" ]; then
-    ALL_FILES+=("${EXPORT_IMG_FILES[@]}")
-fi
-if [ ${#EXPORT_VERSIONED_FILES[@]} -gt 0 ]; then
-    ALL_FILES+=("${EXPORT_VERSIONED_FILES[@]}")
-fi
+for prefix in "${!GROUPED_FILES[@]}"; do
+    ALL_FILES+=("${GROUPED_FILES[$prefix]}")
+done
 
 # Check if any files were found
 if [ ${#ALL_FILES[@]} -eq 0 ]; then
     echo "No *.img, *-export.img, or *-export-*.img files found in $DIR"
     exit 0
 fi
+
+echo "Selected files (newest version per prefix):"
+for file in "${ALL_FILES[@]}"; do
+    echo "  $(basename "$file")"
+done
+echo ""
 
 # Counter for loop devices
 LOOP_NUM=0
