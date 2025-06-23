@@ -1,6 +1,7 @@
-.venv
 *.swp
+.venv
 Pipfile.lock
+configuration-export.tar.gz
 id_rsa.operator
 roles
 secrets
