@@ -27,3 +27,15 @@
         disk_format: ari
         is_public: true
         filename: /share/ironic/ironic/ironic-agent.initramfs
+
+    - name: Create OSISM node image # noqa: run-once[task]
+      delegate_to: localhost
+      run_once: true
+      openstack.cloud.image:
+        cloud: admin
+        state: present
+        name: osism-node
+        container_format: bare
+        disk_format: qcow2
+        is_public: true
+        filename: /share/ironic/ironic/osism.qcow2
