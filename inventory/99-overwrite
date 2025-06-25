@@ -7,3 +7,7 @@
 # in the cfg-generics repository.
 #
 # https://github.com/osism/cfg-generics/tree/main/inventory
+
+[ironic-tftp]
+
+[ironic-http]
