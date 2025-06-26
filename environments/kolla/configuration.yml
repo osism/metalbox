@@ -22,3 +22,7 @@ om_enable_rabbitmq_high_availability: false
 om_enable_rabbitmq_quorum_queues: false
 
 enable_ironic_agent_download_images: false
+
+ironic_external_callback_url_interface: loopback0
+ironic_external_callback_url_address_family: ipv6
+ironic_external_callback_url_interface_address: "{{ 'ironic_external_callback_url' | kolla_address }}"
