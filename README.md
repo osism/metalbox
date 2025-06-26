@@ -60,3 +60,15 @@
     ```
 
 18. Sync baremetal nodes with `osism sync ironic`
+
+## Update of the container registry
+
+1. Download `registry.tar.bz2` from https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/metalbox/registry.tar.bz2
+2. Copy `registry.tar.bz2` to `/home/dragon` on the Metalbox node
+3. Run the `update-registry.sh` script to update the container registry.
+
+## Update of the manager service
+
+1. Change to the `/opt/manager` directory on the Metalbox node
+2. Run `docker compose pull` to pull latest container images
+3. Run `docker compose up -d` to update the manager service
