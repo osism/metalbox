@@ -65,7 +65,7 @@
 
 1. Download `registry.tar.bz2` from https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/metalbox/registry.tar.bz2
 2. Copy `registry.tar.bz2` to `/home/dragon` on the Metalbox node
-3. Run the `update-registry.sh` script to update the container registry.
+3. Run `SKIP_DOWNLOAD=true update-registry.sh` to update the container registry
 
 ## Update of the manager service
 
