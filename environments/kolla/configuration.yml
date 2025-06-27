@@ -23,6 +23,7 @@ om_enable_rabbitmq_quorum_queues: false
 
 enable_ironic_agent_download_images: false
 
-ironic_external_callback_url_interface: loopback0
-ironic_external_callback_url_address_family: ipv6
-ironic_external_callback_url_interface_address: "{{ 'ironic_external_callback_url' | kolla_address }}"
+ironic_external_interface: loopback0
+ironic_external_address_family: ipv6
+ironic_external_interface_address: "{{ 'ironic_external' | kolla_address }}"
+ironic_http_url: "http://{{ ironic_external_interface_address | put_address_in_context('url') }}/ironic"
