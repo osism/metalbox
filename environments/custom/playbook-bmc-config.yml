@@ -1,0 +1,137 @@
+---
+- name: Build remote board group
+  connection: local
+  hosts: localhost
+  gather_facts: false
+  vars:
+    netbox_api_endpoint: "{{ lookup('env', 'NETBOX_API')  }}"
+    netbox_api_token: "{{ lookup('file', '/run/secrets/NETBOX_TOKEN')  }}"
+    netbox_api_validate_certs: false
+    netbox_api_filter: "site=st state=active tag=managed-by-ironic"
+  tasks:
+    - name: Build remote board inventory group
+      ansible.builtin.add_host:
+        name: "{{ item.value.oob_ip.address | ansible.utils.ipaddr('address')}}"
+        groups: remote_boards
+      loop: >-
+        {{
+          query(
+              'netbox.netbox.nb_lookup',
+              'devices',
+              api_filter=netbox_api_filter,
+              api_endpoint=netbox_api_endpoint,
+              token=netbox_api_token,
+              validate_certs=netbox_api_validate_certs
+          )
+        }}
+      loop_control:
+        label: "{{ item.value.name }}"
+      when: "'oob_ip' in item.value and item.value.oob_ip"
+      changed_when: false
+
+- name: Configure remote board
+  hosts: remote_boards
+  gather_facts: false
+  vars:
+    redfish_user: admin
+    redfish_password: password
+    redfish_scheme: https
+    redfish_basepath: /redfish/v1
+    redfish_baseuri: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}"
+  tasks:
+    - name: Get NetworkAdapter information
+      delegate_to: localhost
+      ansible.builtin.uri:
+        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/Chassis/1/NetworkAdapters"
+        return_content: true
+        force_basic_auth: true
+        url_username: "{{ redfish_user }}"
+        url_password: "{{ redfish_password }}"
+        validate_certs: false
+      register: nics
+    - name: Configure Cisco VIC UCSC-M-V5Q50GV2
+      vars:
+        # NOTE: I cannot find a way to map attributes with dots ('@odata.id'), so we dance around that
+        cisco_vics: "{{ nics.json.Members | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | select('search', 'UCSC-M-V5Q50GV2') | list }}"
+      when: cisco_vics | length > 0
+      block:
+        - name: Get NetworkAdapter information
+          delegate_to: localhost
+          ansible.builtin.uri:
+            url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ item }}"
+            return_content: true
+            force_basic_auth: true
+            url_username: "{{ redfish_user }}"
+            url_password: "{{ redfish_password }}"
+            validate_certs: false
+          register: cisco_vics_properties
+          loop: "{{ cisco_vics }}"
+        - name: Configure NetworkAdapter
+          vars:
+            oem_config:
+              Oem:
+                Cisco:
+                  VicConfiguration:
+                    AzureQosEnabled: false
+                    FipEnabled: false
+                    LldpEnabled: false
+                    NivEnabled: false
+                    PhysicalNicModeEnabled: true
+                    PortChannelEnabled: false
+                    RweTsoEnabled: false
+          delegate_to: localhost
+          ansible.builtin.uri:
+            url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ item.item }}"
+            method: PATCH
+            force_basic_auth: true
+            url_username: "{{ redfish_user }}"
+            url_password: "{{ redfish_password }}"
+            validate_certs: false
+            body_format: json
+            body: "{{ oem_config | to_json }}"
+            status_code: 201
+          changed_when: true
+          loop: "{{ cisco_vics_properties.results }}"
+          loop_control:
+            label: "{{ item.item }}"
+          when: item.json.Oem.Cisco.VicConfiguration | dict2items | selectattr('key', 'in', oem_config.Oem.Cisco.VicConfiguration) | items2dict != oem_config.Oem.Cisco.VicConfiguration
+        - name: Configure Cisco VIC UCSC-M-V5Q50GV2 Ports
+          vars:
+            cisco_vics_ports: "{{ cisco_vics_properties.results | map(attribute='json.Controllers') | flatten | map(attribute='Links.NetworkPorts') | flatten | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') }}"
+          when: cisco_vics_ports | length > 0
+          block:
+            - name: Get NetworkPort information
+              delegate_to: localhost
+              ansible.builtin.uri:
+                url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ item }}"
+                return_content: true
+                force_basic_auth: true
+                url_username: "{{ redfish_user }}"
+                url_password: "{{ redfish_password }}"
+                validate_certs: false
+              register: cisco_vics_ports_properties
+              loop: "{{ cisco_vics_ports }}"
+            - name: Configure NetworkPort
+              vars:
+                oem_config:
+                  Oem:
+                    Cisco:
+                      VicPort:
+                        AdminFecMode: "Off"
+                        AdminLinkSpeed: "Auto"
+              delegate_to: localhost
+              ansible.builtin.uri:
+                url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ item.item }}"
+                method: PATCH
+                force_basic_auth: true
+                url_username: "{{ redfish_user }}"
+                url_password: "{{ redfish_password }}"
+                validate_certs: false
+                body_format: json
+                body: "{{ oem_config | to_json }}"
+                status_code: 201
+              changed_when: true
+              loop: "{{ cisco_vics_ports_properties.results }}"
+              loop_control:
+                label: "{{ item.item }}"
+              when: item.json.Oem.Cisco.VicPort | dict2items | selectattr('key', 'in', oem_config.Oem.Cisco.VicPort) | items2dict != oem_config.Oem.Cisco.VicPort
