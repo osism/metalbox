@@ -23,14 +23,15 @@
 10. Run `osism apply hosts` to sync the `/etc/hosts` file
 11. Run `osism apply network` to sync the network configuration
 12. Run `osism apply facts` to sync the facts
-13. Download the SONiC export image from the well known URL. Use the file as
+13. Run `osism apply chrony` to sync the NTP configuration
+14. Download the SONiC export image from the well known URL. Use the file as
     virtual media (vHDD).
-14. Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards remove the virtual
+15. Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards remove the virtual
     media (vHDD).
-15. Run `deploy-infrastructure.sh` to deploy the infrastructure services
-16. Run `deploy-openstack.sh` to Deploy the OpenStack services
-17. Run `osism apply -e custom ironic-upload-images` to upload required Ironic image files
-18. Run `osism sync ironic` to sync the baremetal nodes
+16. Run `deploy-infrastructure.sh` to deploy the infrastructure services
+17. Run `deploy-openstack.sh` to Deploy the OpenStack services
+18. Run `osism apply -e custom ironic-upload-images` to upload required Ironic image files
+19. Run `osism sync ironic` to sync the baremetal nodes
 
 ## Update of the container registry
 

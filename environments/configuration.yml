@@ -1,4 +1,7 @@
 ---
+# chrony
+chrony_bind_local_interfaces_only: false
+
 # docker
 docker_opts:
   max-concurrent-downloads: 20
