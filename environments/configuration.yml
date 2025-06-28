@@ -10,6 +10,7 @@ docker_version: '5:27.5.1'
 docker_facts: false
 docker_insecure_registries:
   - localhost:5000
+docker_ipv6: true
 
 # hosts
 hosts_type: template
