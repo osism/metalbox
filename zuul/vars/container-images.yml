@@ -14,7 +14,7 @@ images_manager:
   - dnsmasq-osism:2.90
   - inventory-reconciler:latest
   - kolla-ansible:2024.2
-  - netbox:v4.2.2
+  - netbox:v4.3.3
   - openstackclient:2024.2
   - osism-ansible:latest
   - osism:latest
