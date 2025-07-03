@@ -44,3 +44,14 @@
 1. Change to the `/opt/manager` directory on the Metalbox node
 2. Run `docker compose pull` to pull latest container images
 3. Run `docker compose up -d` to update the manager service
+
+## Update of the netbox data
+
+1. Export the NetBox configuration repository with `netbox-manager export-archive -i`.
+   When using a NetBox configuration repository provided by us, the file can be downloaded
+   from GitHub after a trigger of the `Run export` action. Copy `netbox-export.img` to
+   `/home/dragon` on the Metalbox node
+2. Run `mount-images.sh` to mount the `netbox-export.img` image
+3. Run `netbox-import.sh` to sync the files in `/opt/configuration/netbox`
+4. Run `unmount-images.sh` to unmount the `netbox-export.img` image
+5. Run `netbox-manage.sh` to sync netbox with the state in `/opt/configuration/netbox`
