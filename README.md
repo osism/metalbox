@@ -14,8 +14,8 @@
    from GitHub after a trigger of the `Run export` action. Use the file  as virtual
    media (vHDD) and run `netbox-import.sh`.
    Afterwards remove the virtual media (vHDD).
-5. Run `deploy-netbox.sh` to deploy the Netbox service.
-6. Run `netbox-manage.sh` to initialise the Netbox service.
+5. Run `deploy-netbox.sh` to deploy the NetBox service.
+6. Run `netbox-manage.sh` to initialise the NetBox service.
 7. Set the managed site by running `netbox-site.sh SITE`
    (replace `SITE` with the slug name of the site managed by this Metalbox)
 8. Run `deploy-manager.sh` to deploy the OSISM manager service.
@@ -39,12 +39,7 @@
 2. Copy `registry.tar.bz2` to `/home/dragon` on the Metalbox node
 3. Run `SKIP_DOWNLOAD=true update-registry.sh` to update the container registry
 
-## Update of the manager service
-
-1. Change to the `/opt/manager` directory on the Metalbox node
-2. Run `update-manager.sh` to update the manager service
-
-## Update of the netbox data
+## Update of the NetBox data
 
 1. Export the NetBox configuration repository with `netbox-manager export-archive -i`.
    When using a NetBox configuration repository provided by us, the file can be downloaded
@@ -54,3 +49,21 @@
 3. Run `netbox-import.sh` to sync the files in `/opt/configuration/netbox`
 4. Run `unmount-images.sh` to unmount the `netbox-export.img` image
 5. Run `netbox-manage.sh` to sync netbox with the state in `/opt/configuration/netbox`
+
+## Service updates
+
+### Update of the manager service
+
+1. Run `update-manager.sh` to update the manager service
+
+### Update of the NetBox service
+
+1. Run `update-netbox.sh` to update the NetBox service
+
+### Update of the infrastructure services
+
+1. Run `update-infrastructure.sh` to update the infrastructure services
+
+### Update of the OpenStack services
+
+1. Run `update-openstack.sh` to update the OpenStack services
