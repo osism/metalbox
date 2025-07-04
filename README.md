@@ -42,8 +42,7 @@
 ## Update of the manager service
 
 1. Change to the `/opt/manager` directory on the Metalbox node
-2. Run `docker compose pull` to pull latest container images
-3. Run `docker compose up -d` to update the manager service
+2. Run `update-manager.sh` to update the manager service
 
 ## Update of the netbox data
 
