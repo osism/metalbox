@@ -30,6 +30,7 @@
              )
              | unique
           }}
+
     - name: Build remote board inventory group
       ansible.builtin.add_host:
         name: "{{ item.value.oob_ip.address | ansible.utils.ipaddr('address') }}"
@@ -52,6 +53,10 @@
     redfish_basepath: /redfish/v1
     redfish_validate_certs: false
     redfish_baseuri: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}"
+    snmp_user: SNMP
+    snmp_password: password
+    snmp_authenticationprotocol: HMAC384_SHA512
+    snmp_encryptionprotocol: CFB128_AES128
   tasks:
     - name: Update admin password
       block:  # noqa osism-fqcn
@@ -77,6 +82,7 @@
             url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ item }}"
             url_password: "{{ redfish_default_password }}"
             <<: *uri_defaults
+
         - name: Set new redfish password
           delegate_to: localhost
           vars:
@@ -91,6 +97,7 @@
             status_code: 200
             url_password: "{{ redfish_default_password }}"
             <<: *uri_defaults
+
     - name: Get Manager Interface Information
       delegate_to: localhost
       register: manager_nic
@@ -99,6 +106,7 @@
         <<: &uri_opts
           <<: *uri_defaults
           url_password: "{{ hostvars[inventory_hostname]['redfish_password'] | default(redfish_password) }}"
+
     - name: Configure Manager Interface (Disable IPv6)
       vars:
         oem_config:
@@ -115,6 +123,7 @@
         <<: *uri_opts
       changed_when: true
       when: manager_nic.json.Oem.Cisco | dict2items | selectattr('key', 'in', oem_config.Oem.Cisco) | items2dict != oem_config.Oem.Cisco
+
     - name: Configure Manager Interface (Disable Dynamic DNS)
       vars:
         oem_config:
@@ -132,12 +141,15 @@
         <<: *uri_opts
       changed_when: true
       when: manager_nic.json.Oem.Cisco.DynamicDNS | dict2items | selectattr('key', 'in', oem_config.Oem.Cisco.DynamicDNS) | items2dict != oem_config.Oem.Cisco.DynamicDNS
+
     - name: Configure Manager Interface (DHCPv4)
       vars:
         dhcpv4_config:
           DHCPv4:
             DHCPEnabled: true
             UseDNSServers: true
+            # UseDomainName: true
+            # UseNTPServers: true
       delegate_to: localhost
       ansible.builtin.uri:
         url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/Managers/CIMC/EthernetInterfaces/NICs"
@@ -148,6 +160,7 @@
         <<: *uri_opts
       changed_when: true
       when: manager_nic.json.DHCPv4 | dict2items | selectattr('key', 'in', dhcpv4_config.DHCPv4) | items2dict != dhcpv4_config.DHCPv4
+
     - name: Get Systems
       delegate_to: localhost
       register: systems
@@ -156,12 +169,113 @@
       ansible.builtin.uri:
         url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/Systems"
         <<: *uri_opts
+
+    - name: Get Manager Network Protocol Information
+      delegate_to: localhost
+      register: manager_network_protocol
+      ansible.builtin.uri:
+        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/Managers/CIMC/NetworkProtocol"
+        <<: *uri_opts
+
+    - name: Configure Manager Network Protocol (NTP)
+      vars:
+        ntp_config:
+          NTP:
+            ProtocolEnabled: true
+      delegate_to: localhost
+      ansible.builtin.uri:
+        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/Managers/CIMC/NetworkProtocol"
+        method: PATCH
+        body_format: json
+        body: "{{ ntp_config | to_json }}"
+        status_code: 200
+        <<: *uri_opts
+      changed_when: true
+      when: manager_network_protocol.json.NTP | dict2items | selectattr('key', 'in', ntp_config.NTP) | items2dict != ntp_config.NTP
+
+    - name: Configure Manager Network Protocol (SNMP)
+      vars:
+        snmp_config:
+          SNMP:
+            ProtocolEnabled: true
+            EnableSNMPv1: false
+            EnableSNMPv2c: false
+            EnableSNMPv3: true
+      delegate_to: localhost
+      ansible.builtin.uri:
+        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/Managers/CIMC/NetworkProtocol"
+        method: PATCH
+        body_format: json
+        body: "{{ snmp_config | to_json }}"
+        status_code: 200
+        <<: *uri_opts
+      changed_when: true
+      when: manager_network_protocol.json.SNMP | dict2items | selectattr('key', 'in', snmp_config.SNMP) | items2dict != snmp_config.SNMP
+
+    - name: Get Accounts
+      delegate_to: localhost
+      register: accounts
+      ansible.builtin.uri:
+        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/AccountService/Accounts"
+        <<: *uri_opts
+
+    - name: Get account properties
+      delegate_to: localhost
+      register: accounts_properties
+      loop: "{{ accounts.json.Members | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') }}"
+      ansible.builtin.uri:
+        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ item }}"
+        <<: *uri_opts
+
+    - name: Manage SNMP Account
+      delegate_to: localhost
+      vars:
+        snmp_account: "{{ accounts_properties.results | map(attribute='json') | selectattr('UserName', 'equalto', snmp_user) }}"
+        snmp_account_properties:
+          UserName: "{{ snmp_user }}"
+          RoleId: SNMPOnly
+          Enabled: true
+          SNMP:
+            AuthenticationProtocol: "{{ snmp_authenticationprotocol }}"
+            EncryptionProtocol: "{{ snmp_encryptionprotocol }}"
+          AccountTypes:
+            - SNMP
+        snmp_account_properties_create_only:
+          SNMP:
+            AuthenticationKey: "{{ snmp_password }}"
+            EncryptionKey: "{{ snmp_password }}"
+      block:  # noqa osism-fqcn
+        - name: Create SNMP Account
+          delegate_to: localhost
+          when: snmp_account | length == 0
+          ansible.builtin.uri:
+            url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/AccountService/Accounts"
+            method: POST
+            body_format: json
+            body: "{{ snmp_account_properties | combine(snmp_account_properties_create_only, recursive=True) | to_json }}"
+            status_code: 201
+            <<: *uri_opts
+
+        - name: Update SNMP Account
+          delegate_to: localhost
+          when:
+            - snmp_account | length == 1
+            - snmp_account | first | dict2items | selectattr('key', 'in', snmp_account_properties) | items2dict != snmp_account_properties
+          ansible.builtin.uri:
+            url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ snmp_account | first | dict2items | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | first }}"
+            method: PATCH
+            body_format: json
+            body: "{{ snmp_account_properties | combine(snmp_account_properties_create_only, recursive=True) | to_json }}"
+            status_code: 200
+            <<: *uri_opts
+
     - name: Get NetworkAdapter information
       delegate_to: localhost
       register: nics
       ansible.builtin.uri:
         url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/Chassis/1/NetworkAdapters"
         <<: *uri_opts
+
     - name: Configure Cisco VIC UCSC-M-V5Q50GV2
       vars:
         cisco_vics: "{{ nics.json.Members | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | select('search', 'UCSC-M-V5Q50GV2') | list }}"
@@ -173,6 +287,7 @@
           ansible.builtin.uri:
             url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ systems.json.Members | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | first }}"
             <<: *uri_opts
+
         - name: Manage System Power
           block:  # noqa osism-fqcn
             - name: Power On System
@@ -188,6 +303,7 @@
                 body: "{{  payload | to_json }}"
                 status_code: 204
                 <<: *uri_opts
+
             - name: Get CISCO NetworkAdapter information
               delegate_to: localhost
               register: cisco_vics_properties
@@ -198,6 +314,7 @@
               ansible.builtin.uri:
                 url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ item }}"
                 <<: *uri_opts
+
             - name: Configure NetworkAdapter
               vars:
                 oem_config:
@@ -224,6 +341,7 @@
               loop_control:
                 label: "{{ item.item }}"
               when: item.json.Oem.Cisco.VicConfiguration | dict2items | selectattr('key', 'in', oem_config.Oem.Cisco.VicConfiguration) | items2dict != oem_config.Oem.Cisco.VicConfiguration
+
             - name: Configure Cisco VIC UCSC-M-V5Q50GV2 Ports
               vars:
                 cisco_vics_ports: "{{ cisco_vics_properties.results | map(attribute='json.Controllers') | flatten | map(attribute='Links.NetworkPorts') | flatten | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') }}"
@@ -236,6 +354,7 @@
                     <<: *uri_opts
                   register: cisco_vics_ports_properties
                   loop: "{{ cisco_vics_ports }}"
+
                 - name: Configure NetworkPort
                   vars:
                     oem_config:
