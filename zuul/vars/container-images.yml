@@ -12,6 +12,7 @@ images:
 images_manager:
   - ara-server:1.7.2
   - dnsmasq-osism:2.90
+  - gnmic:0.41.0
   - inventory-reconciler:latest
   - kolla-ansible:2024.2
   - netbox:v4.3.3
@@ -35,6 +36,7 @@ images_kolla:
   - mariadb-clustercheck:2024.2
   - mariadb-server:2024.2
   - memcached:2024.2
+  - prometheus-v2-server:2024.2
   - rabbitmq:2024.2
   - redis-sentinel:2024.2
   - redis:2024.2
