@@ -1,6 +1,11 @@
 ---
 # chrony
 chrony_bind_local_interfaces_only: false
+chrony_allowed_subnets:
+  - 10/8
+  - 127.0.0.1/32
+  - 172.16/12
+  - 192.168/16
 
 # docker
 docker_opts:
