@@ -276,7 +276,35 @@
         url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/Chassis/1/NetworkAdapters"
         <<: *uri_opts
 
-    - name: Configure Cisco VIC UCSC-M-V5Q50GV2
+    - name: Get System 1 Storage
+      delegate_to: localhost
+      register: storage
+      ansible.builtin.uri:
+        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ systems.json.Members | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | first }}/Storage"
+        status_code:
+          - 200
+          - 503  # Returned by CIMC storage endpoint when powered off, but still delivers the correct information, so we accept it here in order to check if we actually have MSTOR-RAID. Subsequent calls to the MSTOR-RAID directly succeed independent of the power state
+        <<: *uri_opts
+
+    - name: Get System 1 MSTOR-RAID
+      delegate_to: localhost
+      vars:
+        mstor_raid: "{{ storage.json.Members | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | select('search', 'MSTOR-RAID') }}"
+      when: mstor_raid | length > 0
+      register: mstor_raid
+      ansible.builtin.uri:
+        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ mstor_raid | first }}"
+        <<: *uri_opts
+
+    - name: Get System 1 MSTOR-RAID Volumes
+      delegate_to: localhost
+      when: mstor_raid | length > 0
+      register: mstor_raid_volumes
+      ansible.builtin.uri:
+        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ mstor_raid.json.Volumes | dict2items | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | first }}"
+        <<: *uri_opts
+
+    - name: Configure Properties Requiring Power
       vars:
         cisco_vics: "{{ nics.json.Members | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | select('search', 'UCSC-M-V5Q50GV2') | list }}"
       when: cisco_vics | length > 0
@@ -376,6 +404,79 @@
                   loop_control:
                     label: "{{ item.item }}"
                   when: item.json.Oem.Cisco.VicPort | dict2items | selectattr('key', 'in', oem_config.Oem.Cisco.VicPort) | items2dict != oem_config.Oem.Cisco.VicPort
+
+            - name: Wait for System 1 Storage to be available
+              delegate_to: localhost
+              register: storage
+              until: "'status' in storage and storage.status == 200"
+              retries: 60
+              delay: 5
+              ansible.builtin.uri:
+                url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ systems.json.Members | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | first }}/Storage"
+                <<: *uri_opts
+
+            - name: Create System 1 MSTOR-RAID Root Volume
+              when: mstor_raid_volumes.json.Members | length == 0
+              block:  # noqa osism-fqcn
+                - name: Get Drive properties
+                  delegate_to: localhost
+                  register: mstor_raid_drives_properties
+                  loop: "{{ mstor_raid.json.Drives | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') }}"
+                  ansible.builtin.uri:
+                    url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ item }}"
+                    <<: *uri_opts
+                - name: Create MSTOR-RAID Volume
+                  delegate_to: localhost
+                  vars:
+                    mstor_raid_drives_filter:
+                      Protocol: SATA
+                      MediaType: SSD
+                      MaxCapacityBytes: "{{ 500 * 1024**3 }}"
+                    volume_config:
+                      Name: root
+                      DisplayName: root
+                      RAIDType: RAID1
+                      Encrypted: false
+                      OptimumIoSizeBytes: "{{ 2**15 }}"
+                      Oem:
+                        Cisco:
+                          VolumeAccessPolicy: ReadWrite
+                          RequestedWriteCachePolicy: WriteThrough
+                          VolumeReadAheadPolicy: NoReadAhead
+                          VolumeIoPolicy: DirectIo
+                          Spans:
+                            - SpanId: 0
+                              DrivesList: >-
+                                {{
+                                  mstor_raid_drives_properties.results
+                                  | selectattr('json.Protocol', 'equalto', mstor_raid_drives_filter.Protocol)
+                                  | selectattr('json.MediaType', 'equalto', mstor_raid_drives_filter.MediaType)
+                                  | selectattr('json.CapacityBytes', 'lt', mstor_raid_drives_filter.MaxCapacityBytes | int)
+                                  | map(attribute='item')
+                                  | product(['@odata.id'])
+                                  | map('reverse')
+                                  | zip
+                                  | map('community.general.dict')
+                                }}
+                  ansible.builtin.uri:
+                    url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ mstor_raid.json.Volumes | dict2items | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | first }}"
+                    method: POST
+                    body_format: json
+                    body: "{{ volume_config | to_json }}"
+                    status_code: 202
+                    <<: *uri_opts
+
+                - name: Get System 1 MSTOR-RAID Volumes
+                  delegate_to: localhost
+                  when: mstor_raid | length > 0
+                  register: mstor_raid_volumes
+                  until: mstor_raid_volumes.json.Members | length > 0
+                  retries: 60
+                  delay: 5
+                  ansible.builtin.uri:
+                    url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ mstor_raid.json.Volumes | dict2items | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | first }}"
+                    <<: *uri_opts
+
           always:
             - name: Power Off System
               delegate_to: localhost
