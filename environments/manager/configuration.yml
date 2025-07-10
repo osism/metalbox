@@ -78,6 +78,7 @@ netbox_role_mapping: {}
 netbox_data_types:
   - dnsmasq_parameters
   - frr_parameters
+  - gnmic_parameters
   - netplan_parameters
   - primary_ip
 
