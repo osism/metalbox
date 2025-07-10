@@ -27,3 +27,17 @@ ironic_external_interface: loopback0
 ironic_external_address_family: ipv6
 ironic_external_interface_address: "{{ 'ironic_external' | kolla_address }}"
 ironic_http_url: "http://{{ ironic_external_interface_address | put_address_in_context('url') }}/ironic"
+
+enable_ironic_prometheus_exporter: false
+enable_prometheus_blackbox_exporter: false
+enable_prometheus_ceph_mgr_exporter: false
+enable_prometheus_elasticsearch_exporter: false
+enable_prometheus_haproxy_exporter: false
+enable_prometheus_libvirt_exporter: false
+enable_prometheus_memcached_exporter: false
+enable_prometheus_mysqld_exporter: false
+enable_prometheus_node_exporter: false
+enable_prometheus_openstack_exporter: false
+enable_prometheus_openstack_exporter_external: false
+enable_prometheus_proxysql_exporter: false
+enable_prometheus_rabbitmq_exporter: false
