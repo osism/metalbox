@@ -43,3 +43,5 @@ enable_prometheus_openstack_exporter: false
 enable_prometheus_openstack_exporter_external: false
 enable_prometheus_proxysql_exporter: false
 enable_prometheus_rabbitmq_exporter: false
+
+prometheus_cmdline_extras: "--web.enable-remote-write-receiver"
