@@ -29,7 +29,9 @@ ironic_external_interface_address: "{{ 'ironic_external' | kolla_address }}"
 ironic_http_url: "http://{{ ironic_external_interface_address | put_address_in_context('url') }}/ironic"
 
 enable_ironic_prometheus_exporter: false
+enable_prometheus_alertmanager: false
 enable_prometheus_blackbox_exporter: false
+enable_prometheus_cadvisor: false
 enable_prometheus_ceph_mgr_exporter: false
 enable_prometheus_elasticsearch_exporter: false
 enable_prometheus_haproxy_exporter: false
