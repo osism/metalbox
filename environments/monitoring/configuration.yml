@@ -1,4 +1,10 @@
 ---
-# Dummy variable to avoid error because ansible does not recognize the
-# file as a good configuration file when no variable in it.
-dummy:
+gnmic_outputs:
+  prometheus:
+    type: prometheus_write
+    url: http://metalbox:9091/api/v1/write
+    metadata:
+      include: true
+    authentication:
+      username: admin
+      password: password
