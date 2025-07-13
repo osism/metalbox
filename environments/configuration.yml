@@ -19,7 +19,7 @@ docker_insecure_registries:
 # hosts
 hosts_type: template
 hosts_additional_entries:
-  api.metalbox.osism.xyz: 192.168.42.10
+  api.metalbox.cloud: 192.168.42.10
 
 # network
 network_allow_service_restart: true
