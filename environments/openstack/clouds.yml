@@ -3,7 +3,7 @@ clouds:
   system:
     auth:
       username: admin
-      auth_url: http://api.metalbox.osism.xyz:5000/v3
+      auth_url: http://api.metalbox.cloud:5000/v3
       user_domain_name: default
       system_scope: all
     cacert: /etc/ssl/certs/ca-certificates.crt
@@ -12,7 +12,7 @@ clouds:
     auth:
       username: admin
       project_name: admin
-      auth_url: http://api.metalbox.osism.xyz:5000/v3
+      auth_url: http://api.metalbox.cloud:5000/v3
       project_domain_name: default
       user_domain_name: default
     cacert: /etc/ssl/certs/ca-certificates.crt

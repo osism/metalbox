@@ -48,7 +48,7 @@ manager_openstack_os_project_domain_name: Default
 manager_openstack_os_user_domain_name: Default
 manager_openstack_os_project_name: admin
 manager_openstack_os_username: admin
-manager_openstack_os_auth_url: http://api.metalbox.osism.xyz:5000/v3
+manager_openstack_os_auth_url: http://api.metalbox.cloud:5000/v3
 
 ##########################################################
 # netbox
