@@ -182,6 +182,8 @@
         ntp_config:
           NTP:
             ProtocolEnabled: true
+            NTPServers:
+              - metalbox
       delegate_to: localhost
       ansible.builtin.uri:
         url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}/Managers/CIMC/NetworkProtocol"
