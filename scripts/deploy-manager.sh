@@ -21,6 +21,4 @@ popd
 
 wait_for_container_healthy
 
-bash -c /opt/configuration/scripts/ironic-import.sh
-
 cat /opt/configuration/environments/.vault_pass | osism vault password set

@@ -30,7 +30,7 @@
     media (vHDD).
 16. Run `deploy-infrastructure.sh` to deploy the infrastructure services
 17. Run `deploy-openstack.sh` to Deploy the OpenStack services
-18. Run `osism apply -e custom ironic-upload-images` to upload required Ironic image files
+18. Upload required Ironic image files to `/opt/httpd/data/root`
 19. Run `osism sync ironic` to sync the baremetal nodes
 
 ## Update of the container registry
