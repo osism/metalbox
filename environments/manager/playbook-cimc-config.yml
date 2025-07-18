@@ -98,6 +98,15 @@
             url_password: "{{ redfish_default_password }}"
             <<: *uri_defaults
 
+        - name: Test login
+          delegate_to: localhost
+          retries: 12
+          delay: 5
+          ansible.builtin.uri:
+            url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ redfish_basepath }}"
+            url_password: "{{ hostvars[inventory_hostname]['redfish_password'] | default(redfish_password) }}"
+            <<: *uri_defaults
+
     - name: Get Manager Interface Information
       delegate_to: localhost
       register: manager_nic
