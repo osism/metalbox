@@ -25,6 +25,7 @@ ara_server_host: 192.168.42.10
 ##########################################################
 # listener
 
+enable_listener: true
 manager_listener_broker_hosts:
   - 192.168.42.10
 manager_listener_broker_username: openstack
