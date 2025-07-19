@@ -37,8 +37,6 @@ osism apply httpd
 /opt/configuration/scripts/sonic-import.sh
 osism apply dnsmasq
 osism apply keystone
-osism apply glance
 osism apply ironic
 osism apply openstackclient
-osism apply -e custom ironic-upload-images
 osism sync ironic

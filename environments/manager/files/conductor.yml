@@ -6,6 +6,9 @@ ironic_parameters:
     redfish_password: "{{ remote_board_password }}"
     redfish_address: "https://{{ remote_board_address }}"
     redfish_verify_ca: False
-    deploy_kernel: ironic-agent-kernel
-    deploy_ramdisk: ironic-agent-initramfs
+    deploy_kernel: http://metalbox/osism-ipa.kernel
+    deploy_ramdisk: http://metalbox/osism-ipa.initramfs
   boot_interface: redfish-virtual-media
+  instance_info:
+    image_source: http://metalbox/osism-node.qcow2
+    image_checksum: http://metalbox/osism-node.qcow2.CHECKSUM
