@@ -18,15 +18,18 @@
       ansible.builtin.set_fact:
         netbox_devices: >-
           {{
-             netbox_devices | default([])
-             +
-             query(
-                 'netbox.netbox.nb_lookup',
-                 'devices',
-                 api_filter=api_filter,
-                 api_endpoint=netbox_api_endpoint,
-                 token=netbox_api_token,
-                 validate_certs=netbox_api_validate_certs
+            (
+               netbox_devices | default([])
+               +
+               query(
+                   'netbox.netbox.nb_lookup',
+                   'devices',
+                   api_filter=api_filter,
+                   api_endpoint=netbox_api_endpoint,
+                   token=netbox_api_token,
+                   validate_certs=netbox_api_validate_certs
+               )
+               | selectattr('value.custom_fields.maintenance', 'equalto', true)
              )
              | unique
           }}
