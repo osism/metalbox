@@ -1,18 +1,25 @@
 # metalbox
 
+## Preparation
+
+1. Download the Metalbox image `osism-metalbox-image.zip` from the well known URL.
+   Unzip the `osism-metalbox-image.zip` file. The unzipped file is named
+   `osism-metalbox-image.raw`.
+2. Download the latest small [Grml](https://grml.org/download/) live ISO file.
+   When creating this document, the file name was `grml-small-2025.05-amd64.iso`.
+3. Download the SONiC export image `sonic-export.img` from the well known URL.
+4. Export the NetBox configuration repository with `netbox-manager export-archive -i`.
+   When using a NetBox configuration repository provided by us, the file `netbox-export.img`
+   can be downloaded from GitHub after a trigger of the `Run export` action.
+
 ## Installation
 
-1. Download the Metalbox image from the well known URL. Use the file as virtual
-   media (vHDD).
-2. Download the small [Grml](https://grml.org/download/) live ISO file. Use the
-   file as virtual media (vDVD) and boot it.
+1. Use the `osism-metalbox-image.raw` file as virtual media (vHDD).
+2. Use the `grml-small-2025.05-amd64.iso` file as virtual media (vDVD) and boot it.
 3. Write the Metalbox image with `dd if=/dev/sdc of=/dev/sda bs=4M status=progress` to
    the first disk. Afterwards power off the node, remove all virtual media devices and
    power on the node again.
-4. Export the NetBox configuration repository with `netbox-manager export-archive -i`.
-   When using a NetBox configuration repository provided by us, the file can be downloaded
-   from GitHub after a trigger of the `Run export` action. Use the file  as virtual
-   media (vHDD) and run `netbox-import.sh`.
+4. Use the `netbox-export.img` file as virtual media (vHDD) and run `netbox-import.sh`.
    Afterwards remove the virtual media (vHDD).
 5. Run `deploy-netbox.sh` to deploy the NetBox service.
 6. Run `netbox-manage.sh` to initialise the NetBox service.
@@ -24,8 +31,7 @@
 11. Run `osism apply network` to sync the network configuration
 12. Run `osism apply facts` to sync the facts
 13. Run `osism apply chrony` to sync the NTP configuration
-14. Download the SONiC export image from the well known URL. Use the file as
-    virtual media (vHDD).
+14. Use the file `sonic-export.img` as virtual media (vHDD).
 15. Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards remove the virtual
     media (vHDD).
 16. Run `deploy-infrastructure.sh` to deploy the infrastructure services
