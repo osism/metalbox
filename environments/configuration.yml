@@ -6,6 +6,7 @@ chrony_allowed_subnets:
   - 127.0.0.1/32
   - 172.16/12
   - 192.168/16
+  - fd33:fd0e:2aee::/48
 
 # docker
 docker_opts:
