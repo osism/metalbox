@@ -9,6 +9,8 @@ ironic_parameters:
     deploy_kernel: http://metalbox/osism-ipa.kernel
     deploy_ramdisk: http://metalbox/osism-ipa.initramfs
   boot_interface: redfish-virtual-media
+  properties:
+    capabilities: 'boot_mode:uefi'
   instance_info:
     image_source: http://metalbox/osism-node.qcow2
     image_checksum: http://metalbox/osism-node.qcow2.CHECKSUM
