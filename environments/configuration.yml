@@ -34,3 +34,6 @@ operator_environment:
 
 # chrony
 chrony_minimum_number_of_servers: 1
+
+# frr
+frr_dummy_interface: loopback0
