@@ -14,7 +14,7 @@
       vars:
         string_items: "{{ item | dict2items | selectattr('value', 'string') | items2dict }}"
         sequence_items: "{{ item | dict2items | rejectattr('value', 'string') | selectattr('value', 'sequence') }}"
-        api_filter: "{{ (sequence_items | map(attribute='key') | zip(sequence_items | map(attribute='value') | map('join', ',')) + string_items | items) | map('join', '=') | join(' ') }}"
+        api_filter: "{{ (sequence_items | map(attribute='key') | zip(sequence_items | map(attribute='value') | map('join', ',')) + string_items | items) | map('join', '=') | join(' ') }}"  # liniting fails on "string_items | items" with "Error rendering template: Can only get item pairs from a mapping." # noqa jinja[invalid]
       ansible.builtin.set_fact:
         netbox_devices: >-
           {{
