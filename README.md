@@ -2,7 +2,7 @@
 
 ## Preparation
 
-1. Download the Metalbox image `osism-metalbox-image.zip` from the well known URL.
+1. Download the Metalbox image [osism-metalbox-image.zip](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-metalbox-image.zip).
    Unzip the `osism-metalbox-image.zip` file. The unzipped file is named
    `osism-metalbox-image.raw`.
 2. Download the latest small [Grml](https://grml.org/download/) live ISO file.
@@ -11,6 +11,12 @@
 4. Export the NetBox configuration repository with `netbox-manager export-archive -i`.
    When using a NetBox configuration repository provided by us, the file `netbox-export.img`
    can be downloaded from GitHub after a trigger of the `Run export` action.
+5. Download the following Ironic images:
+   * [osism-ipa.initramfs](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-ipa.initramfs)
+   * [osism-ipa.kernel](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-ipa.kernel)
+   * [osism-node.qcow2](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-node.qcow2)
+   * [osism-node.qcow2.CHECKSUM](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-node.qcow2.CHECKSUM)
+   * [osism-esp.raw](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-esp.raw)
 
 ## Installation
 
@@ -36,7 +42,7 @@
     media (vHDD).
 16. Run `deploy-infrastructure.sh` to deploy the infrastructure services
 17. Run `deploy-openstack.sh` to Deploy the OpenStack services
-18. Upload required Ironic image files to `/opt/httpd/data/root`
+18. Upload the Ironic image files to `/opt/httpd/data/root`
 19. Run `osism sync ironic` to sync the baremetal nodes
 
 ## Update of the container registry
