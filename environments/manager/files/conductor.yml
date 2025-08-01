@@ -8,6 +8,13 @@ ironic_parameters:
     redfish_verify_ca: False
     deploy_kernel: http://metalbox/osism-ipa.kernel
     deploy_ramdisk: http://metalbox/osism-ipa.initramfs
+    agent_burnin_cpu_timeout: 86400
+    agent_burnin_cpu_cpu: 0
+    agent_burnin_vm_timeout: 86400
+    agent_burnin_vm_vm-bytes: 98%
+    agent_burnin_fio_disk_runtime: 0
+    agent_burnin_fio_disk_loops: 4
+    agent_burnin_fio_disk_smart_test: True
   boot_interface: redfish-virtual-media
   properties:
     capabilities: 'boot_mode:uefi'
