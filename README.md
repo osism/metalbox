@@ -20,6 +20,8 @@
 
 ## Installation
 
+### Without external connectivity
+
 1. Use the `osism-metalbox-image.raw` file as virtual media (vHDD).
 2. Use the `grml-small-2025.05-amd64.iso` file as virtual media (vDVD) and boot it.
 3. Write the Metalbox image with `dd if=/dev/sdc of=/dev/sda bs=4M status=progress` to
@@ -44,6 +46,10 @@
 17. Run `deploy-openstack.sh` to Deploy the OpenStack services
 18. Upload the Ironic image files to `/opt/httpd/data/root`
 19. Run `osism sync ironic` to sync the baremetal nodes
+
+### With external connectivity
+
+1. Use the `grml-small-2025.05-amd64.iso` file as virtual media (vDVD) and boot it.
 
 ## Update of the NetBox data
 
