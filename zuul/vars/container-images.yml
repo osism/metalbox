@@ -18,6 +18,7 @@ images_manager:
   - netbox:v4.3.3
   - openstackclient:2024.2
   - osism-ansible:latest
+  - osism-frontend:latest
   - osism:latest
   - rsync:latest
 
