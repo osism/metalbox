@@ -74,6 +74,7 @@ netbox_filter_inventory:
   - state: active
     site: Discworld
     tag:
+      - managed-by-ironic
       - managed-by-osism
 netbox_role_mapping: {}
 netbox_data_types:
