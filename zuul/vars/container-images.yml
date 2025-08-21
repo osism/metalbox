@@ -21,6 +21,7 @@ images_manager:
   - osism-frontend:latest
   - osism:latest
   - rsync:latest
+  - seed:latest
 
 images_kolla:
   - cron:2024.2
