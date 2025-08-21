@@ -1,0 +1,4 @@
+FROM registry.osism.tech/osism/rsync:latest
+
+# Copy repository content from build context to /data/
+COPY . /data/

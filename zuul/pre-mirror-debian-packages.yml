@@ -1,0 +1,22 @@
+---
+- name: Prepare mirroring of debian packages
+  hosts: all
+
+  tasks:
+    - name: Install required packages
+      become: true
+      ansible.builtin.apt:
+        name:
+          - debmirror
+          - parallel
+          - python3-docker
+          - python3-requests
+
+    - name: Copy Containerfile
+      ansible.builtin.copy:
+        src: Containerfile
+        dest: /tmp/Containerfile
+        mode: 0644
+
+  roles:
+    - ensure-docker
