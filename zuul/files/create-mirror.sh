@@ -5,6 +5,10 @@
 #
 # Environment Variables:
 # - PARALLEL_DOWNLOADS: Number of concurrent downloads (default: 10)
+# - DOWNLOAD_BATCH_SIZE: Size multiplier for download batches (default: 5, results in PARALLEL_DOWNLOADS * 5 per batch)
+# - LOOKUP_BATCH_SIZE: Size multiplier for lookup batches (default: 4, results in PARALLEL_DOWNLOADS * 4 per batch)
+# - RETRY_FAILED_DOWNLOADS: Enable retry of failed downloads (default: true)
+# - MAX_RETRY_COUNT: Maximum number of failed downloads to retry (default: 20)
 # - MIRROR_DIR: Directory for the mirror (default: /tmp/repository)
 # - SCRIPT_DIR: Directory containing config files
 
@@ -12,7 +16,7 @@ set -e
 
 # Global array to track failed URLs
 declare -a FAILED_URLS=()
-# Flag to track if summary was already shown  
+# Flag to track if summary was already shown
 SUMMARY_SHOWN=false
 
 # Configuration
@@ -23,6 +27,10 @@ MIRROR_DIR="${MIRROR_DIR:-/tmp/repository}"
 LOG_FILE="${SCRIPT_DIR}/mirror.log"
 TEMP_DIR="/tmp/mirror-$$"
 PARALLEL_DOWNLOADS="${PARALLEL_DOWNLOADS:-10}"
+DOWNLOAD_BATCH_SIZE="${DOWNLOAD_BATCH_SIZE:-5}"
+LOOKUP_BATCH_SIZE="${LOOKUP_BATCH_SIZE:-4}"
+RETRY_FAILED_DOWNLOADS="${RETRY_FAILED_DOWNLOADS:-true}"
+MAX_RETRY_COUNT="${MAX_RETRY_COUNT:-20}"
 
 # Performance optimizations
 PACKAGES_CACHE_DIR="$TEMP_DIR/packages_cache"
@@ -129,20 +137,31 @@ parallel_download_single() {
     local result=0
     local filename=$(basename "$output")
 
-    echo "    Downloading: $filename" >&2
+    # Log all downloads (but with different verbosity levels)
+    local is_large_file=false
+    if [[ $(echo "$filename" | wc -c) -gt 50 ]] || [[ "$filename" == *"linux-"* ]] || [[ "$filename" == *"docker-"* ]]; then
+        is_large_file=true
+        echo "        Downloading: $filename" >&2
+    else
+        echo "        > $filename" >&2
+    fi
 
     if download_file "$url" "$output"; then
         if [[ -f "$output" && -s "$output" ]]; then
-            echo "    Downloaded successfully: $filename" >&2
+            if [[ "$is_large_file" == "true" ]]; then
+                echo "        + Downloaded: $filename" >&2
+            else
+                echo "        + $filename" >&2
+            fi
             echo "SUCCESS: $filename" >> "$temp_log"
         else
-            echo "    Failed (empty file): $filename" >&2
+            echo "        - Failed (empty file): $filename" >&2
             echo "FAILED: $filename (empty file)" >> "$temp_log"
             rm -f "$output"
             result=1
         fi
     else
-        echo "    Failed (download error): $filename" >&2
+        echo "        - Failed (download error): $filename" >&2
         echo "FAILED: $filename (download error)" >> "$temp_log"
         result=1
     fi
@@ -150,7 +169,7 @@ parallel_download_single() {
     return $result
 }
 
-# Download multiple files in parallel
+# Download multiple files in parallel with improved batching
 parallel_download_files() {
     local download_dir="$1"
     shift
@@ -162,63 +181,155 @@ parallel_download_files() {
 
     log "  Downloading ${#urls[@]} files in parallel (max $PARALLEL_DOWNLOADS concurrent)"
 
-    local temp_log="$TEMP_DIR/download_log_$$.txt"
-    > "$temp_log"
+    # Process URLs in batches for better memory management and retry capability
+    local batch_size=$((PARALLEL_DOWNLOADS * DOWNLOAD_BATCH_SIZE))  # Process DOWNLOAD_BATCH_SIZE x parallel downloads per batch
+    local total_success=0
+    local total_failed=0
+    local total_skipped=0
+    local failed_urls=()
 
-    # Create a temporary file with URL and output path pairs
-    local url_list="$TEMP_DIR/url_list_$$.txt"
-    > "$url_list"
+    for ((i=0; i<${#urls[@]}; i+=batch_size)); do
+        local batch=("${urls[@]:i:batch_size}")
+        local batch_num=$((i/batch_size + 1))
+        local total_batches=$(( (${#urls[@]} + batch_size - 1) / batch_size ))
 
-    for url in "${urls[@]}"; do
-        local filename=$(basename "$url")
-        local output_path="$download_dir/$filename"
+        log "=== Processing batch $batch_num/$total_batches (${#batch[@]} files) ==="
 
-        # Skip if file already exists and is not empty (enhanced check)
-        if [[ -f "$output_path" && -s "$output_path" ]]; then
-            # Verify file is a valid .deb package (basic check)
-            if [[ "$filename" == *.deb ]] && ! file "$output_path" 2>/dev/null | grep -q "Debian binary package"; then
-                # File exists but is corrupted, remove it
-                rm -f "$output_path"
-            else
-                echo "SKIPPED: $filename (already exists)" >> "$temp_log"
-                continue
+        local temp_log="$TEMP_DIR/download_log_batch_${batch_num}_$$.txt"
+        > "$temp_log"
+
+        # Create a temporary file with URL and output path pairs for this batch
+        local url_list="$TEMP_DIR/url_list_batch_${batch_num}_$$.txt"
+        > "$url_list"
+
+        for url in "${batch[@]}"; do
+            local filename=$(basename "$url")
+            local output_path="$download_dir/$filename"
+
+            # Skip if file already exists and is not empty (enhanced check)
+            if [[ -f "$output_path" && -s "$output_path" ]]; then
+                # Verify file is a valid .deb package (basic check)
+                if [[ "$filename" == *.deb ]] && ! file "$output_path" 2>/dev/null | grep -q "Debian binary package"; then
+                    # File exists but is corrupted, remove it
+                    rm -f "$output_path"
+                else
+                    echo "SKIPPED: $filename (already exists)" >> "$temp_log"
+                    continue
+                fi
             fi
+
+            echo "$url|$output_path" >> "$url_list"
+        done
+
+        # Process downloads within this batch sequentially, but with parallel downloads within the batch
+        export -f parallel_download_single download_file
+        export TEMP_DIR
+
+        if [[ -s "$url_list" ]]; then
+            local urls_in_batch=$(wc -l < "$url_list")
+            log "      Starting $urls_in_batch downloads for batch $batch_num (waiting for completion)..."
+
+            # xargs -P waits for all parallel processes to complete before returning
+            cat "$url_list" | xargs -P "$PARALLEL_DOWNLOADS" -I {} bash -c '
+                IFS="|" read -r url output <<< "{}"
+                parallel_download_single "$url" "$output" "'$temp_log'"
+            '
+
+            log "      + All downloads for batch $batch_num completed"
+        else
+            log "      No new downloads needed for batch $batch_num (all files exist)"
         fi
 
-        echo "$url|$output_path" >> "$url_list"
+        # Process batch results
+        local batch_success=0
+        local batch_failed=0
+        local batch_skipped=0
+
+        while IFS= read -r line; do
+            if [[ "$line" == SUCCESS:* ]]; then
+                batch_success=$((batch_success + 1))
+            elif [[ "$line" == FAILED:* ]]; then
+                batch_failed=$((batch_failed + 1))
+                # Extract URL from failed entry for potential retry
+                local failed_filename=${line#FAILED: }
+                failed_filename=${failed_filename%% (*}
+                for url in "${batch[@]}"; do
+                    if [[ "$(basename "$url")" == "$failed_filename" ]]; then
+                        failed_urls+=("$url")
+                        break
+                    fi
+                done
+                warning "      $line"
+            elif [[ "$line" == SKIPPED:* ]]; then
+                batch_skipped=$((batch_skipped + 1))
+            fi
+        done < "$temp_log"
+
+        total_success=$((total_success + batch_success))
+        total_failed=$((total_failed + batch_failed))
+        total_skipped=$((total_skipped + batch_skipped))
+
+        log "=== Batch $batch_num complete: $batch_success succeeded, $batch_failed failed, $batch_skipped skipped ==="
+
+        # Cleanup batch files
+        rm -f "$temp_log" "$url_list"
+
+        # Small delay between batches to clearly show sequential processing
+        if [[ $batch_num -lt $total_batches ]]; then
+            log "    Preparing next batch..."
+            sleep 1
+        fi
     done
 
-    # Use xargs for parallel downloads (GNU parallel disabled due to argument parsing issues)
-    export -f parallel_download_single download_file
-    export TEMP_DIR
+    # Retry failed downloads once with reduced concurrency for better reliability
+    if [[ "$RETRY_FAILED_DOWNLOADS" == "true" ]] && [[ ${#failed_urls[@]} -gt 0 ]] && [[ ${#failed_urls[@]} -le $MAX_RETRY_COUNT ]]; then
+        log "  Retrying ${#failed_urls[@]} failed downloads with reduced concurrency..."
 
-    cat "$url_list" | xargs -P "$PARALLEL_DOWNLOADS" -I {} bash -c '
-        IFS="|" read -r url output <<< "{}"
-        parallel_download_single "$url" "$output" "'$temp_log'"
-    '
+        local retry_temp_log="$TEMP_DIR/retry_download_log_$$.txt"
+        > "$retry_temp_log"
 
-    # Process results
-    local success_count=0
-    local failed_count=0
-    local skipped_count=0
+        local retry_url_list="$TEMP_DIR/retry_url_list_$$.txt"
+        > "$retry_url_list"
 
-    while IFS= read -r line; do
-        if [[ "$line" == SUCCESS:* ]]; then
-            success_count=$((success_count + 1))
-        elif [[ "$line" == FAILED:* ]]; then
-            failed_count=$((failed_count + 1))
-            warning "    $line"
-        elif [[ "$line" == SKIPPED:* ]]; then
-            skipped_count=$((skipped_count + 1))
-        fi
-    done < "$temp_log"
+        for url in "${failed_urls[@]}"; do
+            local filename=$(basename "$url")
+            local output_path="$download_dir/$filename"
+            echo "$url|$output_path" >> "$retry_url_list"
+        done
 
-    log "  Parallel download results: $success_count succeeded, $failed_count failed, $skipped_count skipped"
+        # Use reduced concurrency for retries (max 3 concurrent)
+        local retry_concurrency=$((PARALLEL_DOWNLOADS > 3 ? 3 : PARALLEL_DOWNLOADS))
 
-    # Cleanup
-    rm -f "$temp_log" "$url_list"
+        cat "$retry_url_list" | xargs -P "$retry_concurrency" -I {} bash -c '
+            IFS="|" read -r url output <<< "{}"
+            parallel_download_single "$url" "$output" "'$retry_temp_log'"
+        '
 
-    return $failed_count
+        # Process retry results
+        local retry_success=0
+        local retry_failed=0
+
+        while IFS= read -r line; do
+            if [[ "$line" == SUCCESS:* ]]; then
+                retry_success=$((retry_success + 1))
+                total_success=$((total_success + 1))
+                total_failed=$((total_failed - 1))
+            elif [[ "$line" == FAILED:* ]]; then
+                retry_failed=$((retry_failed + 1))
+                warning "      Retry $line"
+            fi
+        done < "$retry_temp_log"
+
+        log "    Retry results: $retry_success recovered, $retry_failed still failed"
+
+        rm -f "$retry_temp_log" "$retry_url_list"
+    elif [[ ${#failed_urls[@]} -gt $MAX_RETRY_COUNT ]]; then
+        log "    Too many failed downloads (${#failed_urls[@]}) - skipping retry to avoid overwhelming servers (max: $MAX_RETRY_COUNT)"
+    fi
+
+    log "  Total parallel download results: $total_success succeeded, $total_failed failed, $total_skipped skipped"
+
+    return $total_failed
 }
 
 # Parallel package lookup function for a single package
@@ -304,7 +415,7 @@ parallel_package_lookups() {
 
                 # Check if we need to download this file (enhanced validation)
                 local need_download=false
-                
+
                 if [[ ! -f "$local_path" || ! -s "$local_path" ]]; then
                     need_download=true
                 elif [[ "$deb_filename" == *.deb ]] && ! file "$local_path" 2>/dev/null | grep -q "Debian binary package"; then
@@ -312,7 +423,7 @@ parallel_package_lookups() {
                     rm -f "$local_path"
                     need_download=true
                 fi
-                
+
                 if [[ "$need_download" == true ]]; then
                     PARALLEL_LOOKUP_URLS+=("$package_url")
                 else
@@ -339,7 +450,7 @@ cache_packages_file() {
     local packages_url="$1"
     local cache_key=$(echo "$packages_url" | sed 's|[^a-zA-Z0-9]|_|g')
     local cache_file="$PACKAGES_CACHE_DIR/${cache_key}.gz"
-    
+
     if [[ ! -f "$cache_file" ]]; then
         mkdir -p "$PACKAGES_CACHE_DIR"
         if download_file "$packages_url" "$cache_file" >/dev/null 2>&1; then
@@ -361,7 +472,7 @@ find_package_info() {
     # Use cached file
     local cache_key=$(echo "$packages_url" | sed 's|[^a-zA-Z0-9]|_|g')
     local cache_file="$PACKAGES_CACHE_DIR/${cache_key}.gz"
-    
+
     if ! cache_packages_file "$packages_url"; then
         return 1
     fi
@@ -398,7 +509,7 @@ find_package_info() {
         local version=$(echo "$package_info" | cut -d'|' -f1)
         local filename=$(echo "$package_info" | cut -d'|' -f2)
         local result="$version|$base_url/$filename"
-        
+
         # Cache the result
         PACKAGES_METADATA_CACHE[$cache_lookup_key]="$result"
         echo "$result"
@@ -555,21 +666,21 @@ find_best_package() {
 preload_packages_metadata() {
     local repo_configs=("$@")
     declare -gA ALL_PACKAGES_DEPS
-    
+
     log "Preloading package metadata for fast dependency resolution..."
-    
+
     for repo_config in "${repo_configs[@]}"; do
         IFS=':' read -r host path dist components arch <<< "$repo_config"
         local base_url="http://$host$path"
-        
+
         IFS=',' read -ra COMP_ARRAY <<< "$components"
         for component in "${COMP_ARRAY[@]}"; do
             local packages_url="$base_url/dists/$dist/$component/binary-$arch/Packages.gz"
             local cache_key=$(echo "$packages_url" | sed 's|[^a-zA-Z0-9]|_|g')
-            
+
             if cache_packages_file "$packages_url"; then
                 local cache_file="$PACKAGES_CACHE_DIR/${cache_key}.gz"
-                
+
                 # Parse and cache all dependencies at once
                 zcat "$cache_file" 2>/dev/null | awk '
                     BEGIN { RS="\n\n"; FS="\n" }
@@ -599,7 +710,7 @@ preload_packages_metadata() {
             fi
         done
     done
-    
+
     log "Preloaded metadata for ${#ALL_PACKAGES_DEPS[@]} packages"
 }
 
@@ -648,7 +759,7 @@ download_packages() {
 
     # Skip preloading (too slow) - use on-demand resolution instead
     # preload_packages_metadata "${REPOSITORIES[@]}"
-    
+
     log "Resolving dependencies for ${#PACKAGES[@]} initial packages..."
 
     # Process each repository for dependency resolution
@@ -743,26 +854,39 @@ download_packages() {
         esac
     done
 
-    # Perform parallel package lookups with batch processing
+    # Perform parallel package lookups with enhanced batch processing
     if [[ ${#packages_to_lookup[@]} -gt 0 ]]; then
         log "Resolving download URLs for ${#packages_to_lookup[@]} packages..."
 
-        # Process packages in batches for better memory management
-        local batch_size=$((PARALLEL_DOWNLOADS * 3))  # Process 3x parallel downloads at once
+        # Process packages in batches for better memory management and server friendliness
+        local lookup_batch_size=$((PARALLEL_DOWNLOADS * LOOKUP_BATCH_SIZE))  # Process LOOKUP_BATCH_SIZE x parallel lookups at once
         local all_download_urls=()
-        
-        for ((i=0; i<${#packages_to_lookup[@]}; i+=batch_size)); do
-            local batch=("${packages_to_lookup[@]:i:batch_size}")
+        local total_lookup_batches=$(( (${#packages_to_lookup[@]} + lookup_batch_size - 1) / lookup_batch_size ))
+
+        for ((i=0; i<${#packages_to_lookup[@]}; i+=lookup_batch_size)); do
+            local batch=("${packages_to_lookup[@]:i:lookup_batch_size}")
+            local batch_num=$((i/lookup_batch_size + 1))
+            local batch_start=$((i+1))
             local batch_end=$((i + ${#batch[@]}))
-            
-            log "  Processing batch $((i/batch_size + 1)): packages $((i+1))-$batch_end of ${#packages_to_lookup[@]}"
-            
+
+            log "  Processing lookup batch $batch_num/$total_lookup_batches: packages $batch_start-$batch_end of ${#packages_to_lookup[@]}"
+
+            # Add small delay between large batches to be server-friendly
+            if [[ $batch_num -gt 1 ]] && [[ ${#batch[@]} -gt 50 ]]; then
+                log "    Adding brief delay to avoid overwhelming servers..."
+                sleep 2
+            fi
+
             # Use parallel package lookups to collect URLs for this batch
             parallel_package_lookups "$download_dir" "${batch[@]}"
 
             # Accumulate URLs from this batch
             all_download_urls+=("${PARALLEL_LOOKUP_URLS[@]}")
+
+            log "    Lookup batch $batch_num completed: found ${#PARALLEL_LOOKUP_URLS[@]} URLs to download"
         done
+
+        log "URL resolution completed: found ${#all_download_urls[@]} total files to download"
     else
         log "All packages already downloaded or no packages to lookup"
         local all_download_urls=()
@@ -773,21 +897,33 @@ download_packages() {
         log "Starting parallel download of ${#all_download_urls[@]} files..."
 
         if parallel_download_files "$download_dir" "${all_download_urls[@]}"; then
-            # Update downloaded packages based on successfully downloaded files
+            # Optimized: Create lookup map of successfully downloaded files first
+            log "Verifying downloaded packages..."
+            declare -A downloaded_files_map
+            local successful_files=()
+
+            # First pass: collect all successfully downloaded files (O(n))
+            for url in "${all_download_urls[@]}"; do
+                local deb_filename=$(basename "$url")
+                local local_path="$download_dir/$deb_filename"
+
+                if [[ -f "$local_path" && -s "$local_path" ]]; then
+                    downloaded_files_map["$deb_filename"]=1
+                    successful_files+=("$deb_filename")
+                fi
+            done
+
+            # Second pass: match packages to downloaded files (O(m))
+            local matched_packages=0
             for package in "${packages_to_lookup[@]}"; do
-                # Check if any files for this package were downloaded successfully by checking downloaded URLs
                 local package_downloaded=false
-                
-                for url in "${all_download_urls[@]}"; do
-                    local deb_filename=$(basename "$url")
-                    local local_path="$download_dir/$deb_filename"
-                    
-                    if [[ -f "$local_path" && -s "$local_path" ]]; then
-                        # Check if this file belongs to the current package by filename pattern
-                        if [[ "$deb_filename" == *"$package"* ]]; then
-                            success "  Downloaded: $package ($deb_filename)"
-                            package_downloaded=true
-                        fi
+
+                # Check if any downloaded file matches this package
+                for deb_filename in "${successful_files[@]}"; do
+                    if [[ "$deb_filename" == *"$package"* ]]; then
+                        package_downloaded=true
+                        matched_packages=$((matched_packages + 1))
+                        break  # Found match, no need to check more files for this package
                     fi
                 done
 
@@ -798,6 +934,8 @@ download_packages() {
                     fi
                 fi
             done
+
+            log "Package verification completed: $matched_packages packages matched to ${#successful_files[@]} downloaded files"
         fi
     else
         log "All packages already downloaded or no valid URLs found"
@@ -851,7 +989,7 @@ create_repository() {
         cp "$download_dir"/*.deb "$repo_dir/pool/main/"
         local copied_count=$(ls "$repo_dir/pool/main"/*.deb 2>/dev/null | wc -l)
         success "Copied $copied_count packages to repository"
-        
+
         if [[ ${#FAILED_URLS[@]} -gt 0 ]]; then
             log "${YELLOW}Note: Repository created with $copied_count successful downloads, ${#FAILED_URLS[@]} downloads failed${NC}"
         fi
@@ -869,7 +1007,7 @@ create_repository() {
     local packages_size=$(stat -c%s dists/stable/main/binary-amd64/Packages)
     local packages_gz_hash=$(sha256sum dists/stable/main/binary-amd64/Packages.gz | cut -d' ' -f1)
     local packages_gz_size=$(stat -c%s dists/stable/main/binary-amd64/Packages.gz)
-    
+
     cat > dists/stable/Release << EOF
 Origin: Local Mirror
 Label: Local Mirror
@@ -914,7 +1052,7 @@ show_failed_urls_summary() {
     if [[ "$SUMMARY_SHOWN" == "true" ]]; then
         return 0
     fi
-    
+
     if [[ ${#FAILED_URLS[@]} -gt 0 ]]; then
         log ""
         log "${YELLOW}=== FAILED DOWNLOADS SUMMARY ===${NC}"
@@ -927,7 +1065,7 @@ show_failed_urls_summary() {
         log "${YELLOW}Repository was created with successfully downloaded packages.${NC}"
         log ""
     fi
-    
+
     SUMMARY_SHOWN=true
 }
 
@@ -985,7 +1123,11 @@ build_container_image() {
 main() {
     log "Starting Direct Package Mirror creation at $(date)"
     log "Script directory: $SCRIPT_DIR"
-    log "Parallel downloads: $PARALLEL_DOWNLOADS concurrent connections"
+    log "Configuration:"
+    log "  - Parallel downloads: $PARALLEL_DOWNLOADS concurrent connections"
+    log "  - Download batch size: $((PARALLEL_DOWNLOADS * DOWNLOAD_BATCH_SIZE)) files per batch (${PARALLEL_DOWNLOADS} × ${DOWNLOAD_BATCH_SIZE})"
+    log "  - Lookup batch size: $((PARALLEL_DOWNLOADS * LOOKUP_BATCH_SIZE)) packages per batch (${PARALLEL_DOWNLOADS} × ${LOOKUP_BATCH_SIZE})"
+    log "  - Retry failed downloads: $RETRY_FAILED_DOWNLOADS (max: $MAX_RETRY_COUNT)"
 
     check_dependencies
     read_config
@@ -993,10 +1135,10 @@ main() {
     download_packages
     create_repository
     build_container_image
-    
+
     # Show summary before cleanup
     show_failed_urls_summary
-    
+
     cleanup
 
     success "Mirror creation completed successfully!"
