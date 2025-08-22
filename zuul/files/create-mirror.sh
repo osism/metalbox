@@ -553,6 +553,11 @@ find_all_package_versions() {
         IFS=':' read -r host path dist components arch <<< "$repo_config"
         local base_url="http://$host$path"
 
+        # For docker-compose-plugin, only search Docker repositories
+        if [[ "$package_name" == "docker-compose-plugin" ]] && [[ "$host" != "download.docker.com" ]]; then
+            continue
+        fi
+
         # Process each component
         IFS=',' read -ra COMP_ARRAY <<< "$components"
         for component in "${COMP_ARRAY[@]}"; do
@@ -607,7 +612,7 @@ find_best_package() {
 
     # Docker packages need all versions
     case "$package_name" in
-        docker-ce|docker-ce-cli|containerd.io)
+        docker-ce|docker-ce-cli|docker-compose-plugin|containerd.io)
             find_all_package_versions "$package_name" "${repo_configs[@]}"
             return
             ;;
@@ -842,7 +847,7 @@ download_packages() {
     for package in "${processed_packages[@]}"; do
         # Skip if already downloaded (check only for non-Docker packages)
         case "$package" in
-            docker-ce|docker-ce-cli|containerd.io)
+            docker-ce|docker-ce-cli|docker-compose-plugin|containerd.io)
                 # Docker packages: always check for new versions
                 packages_to_lookup+=("$package")
                 ;;
