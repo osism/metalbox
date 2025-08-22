@@ -54,11 +54,12 @@
     run: zuul/mirror-debian-packages.yml
     timeout: 16200
     files:
-      - "^zuul/mirror-debian-packages.yml"
-      - "^zuul/pre-mirror-debian-packages.yml"
+      - "^zuul/files/Containerfile"
       - "^zuul/files/create-mirror.sh"
       - "^zuul/files/packages.list"
       - "^zuul/files/repositories.conf"
+      - "^zuul/mirror-debian-packages.yml"
+      - "^zuul/pre-mirror-debian-packages.yml"
 
 - job:
     name: metalbox-mirror-container-images
