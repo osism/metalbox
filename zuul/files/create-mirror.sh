@@ -10,6 +10,11 @@
 
 set -e
 
+# Global array to track failed URLs
+declare -a FAILED_URLS=()
+# Flag to track if summary was already shown  
+SUMMARY_SHOWN=false
+
 # Configuration
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 REPOSITORIES_CONF="${SCRIPT_DIR}/repositories.conf"
@@ -844,7 +849,12 @@ create_repository() {
     # Copy packages to pool
     if find "$download_dir" -name "*.deb" -type f | head -1 >/dev/null 2>&1; then
         cp "$download_dir"/*.deb "$repo_dir/pool/main/"
-        success "Copied $(ls "$repo_dir/pool/main"/*.deb | wc -l) packages to repository"
+        local copied_count=$(ls "$repo_dir/pool/main"/*.deb 2>/dev/null | wc -l)
+        success "Copied $copied_count packages to repository"
+        
+        if [[ ${#FAILED_URLS[@]} -gt 0 ]]; then
+            log "${YELLOW}Note: Repository created with $copied_count successful downloads, ${#FAILED_URLS[@]} downloads failed${NC}"
+        fi
     else
         error "No .deb files found to copy"
     fi
@@ -898,8 +908,32 @@ setup_mirror_directory() {
     success "Mirror directory created: $MIRROR_DIR"
 }
 
+# Show summary of failed URLs
+show_failed_urls_summary() {
+    # Only show summary once
+    if [[ "$SUMMARY_SHOWN" == "true" ]]; then
+        return 0
+    fi
+    
+    if [[ ${#FAILED_URLS[@]} -gt 0 ]]; then
+        log ""
+        log "${YELLOW}=== FAILED DOWNLOADS SUMMARY ===${NC}"
+        log "The following ${#FAILED_URLS[@]} URLs failed to download:"
+        log ""
+        for url in "${FAILED_URLS[@]}"; do
+            log "  - $url"
+        done
+        log ""
+        log "${YELLOW}Repository was created with successfully downloaded packages.${NC}"
+        log ""
+    fi
+    
+    SUMMARY_SHOWN=true
+}
+
 # Cleanup
 cleanup() {
+    show_failed_urls_summary
     log "Cleaning up temporary files..."
     if [[ -d "$TEMP_DIR" ]]; then
         rm -rf "$TEMP_DIR"
@@ -959,6 +993,10 @@ main() {
     download_packages
     create_repository
     build_container_image
+    
+    # Show summary before cleanup
+    show_failed_urls_summary
+    
     cleanup
 
     success "Mirror creation completed successfully!"
