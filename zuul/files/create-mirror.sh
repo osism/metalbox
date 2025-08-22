@@ -854,7 +854,12 @@ create_repository() {
     dpkg-scanpackages --multiversion pool/main /dev/null > dists/stable/main/binary-amd64/Packages 2>/dev/null
     gzip -9c dists/stable/main/binary-amd64/Packages > dists/stable/main/binary-amd64/Packages.gz
 
-    # Create Release file
+    # Create Release file with proper checksums
+    local packages_hash=$(sha256sum dists/stable/main/binary-amd64/Packages | cut -d' ' -f1)
+    local packages_size=$(stat -c%s dists/stable/main/binary-amd64/Packages)
+    local packages_gz_hash=$(sha256sum dists/stable/main/binary-amd64/Packages.gz | cut -d' ' -f1)
+    local packages_gz_size=$(stat -c%s dists/stable/main/binary-amd64/Packages.gz)
+    
     cat > dists/stable/Release << EOF
 Origin: Local Mirror
 Label: Local Mirror
@@ -863,6 +868,9 @@ Codename: stable
 Date: $(date -u "+%a, %d %b %Y %H:%M:%S UTC")
 Architectures: amd64
 Components: main
+SHA256:
+ $packages_hash $packages_size main/binary-amd64/Packages
+ $packages_gz_hash $packages_gz_size main/binary-amd64/Packages.gz
 EOF
 
     # Verify repository creation
@@ -870,8 +878,6 @@ EOF
 
     if [[ $pkg_count -gt 0 ]]; then
         success "Repository created with $pkg_count packages at: $repo_dir"
-        log "Repository is ready to be served via HTTP"
-        log "Add to APT sources: deb http://your-server/ stable main"
     else
         error "Repository creation failed - no packages in Packages file"
     fi
