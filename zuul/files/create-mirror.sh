@@ -667,12 +667,12 @@ find_best_package() {
     fi
 }
 
-# Preload all package metadata for fast dependency resolution
+# High-performance dependency resolution with single-pass parsing
 preload_packages_metadata() {
     local repo_configs=("$@")
     declare -gA ALL_PACKAGES_DEPS
 
-    log "Preloading package metadata for fast dependency resolution..."
+    log "Preloading package metadata for optimized dependency resolution..."
 
     for repo_config in "${repo_configs[@]}"; do
         IFS=':' read -r host path dist components arch <<< "$repo_config"
@@ -686,32 +686,44 @@ preload_packages_metadata() {
             if cache_packages_file "$packages_url"; then
                 local cache_file="$PACKAGES_CACHE_DIR/${cache_key}.gz"
 
-                # Parse and cache all dependencies at once
+                # Optimized single-pass parsing: extract ALL dependencies at once
+                local temp_deps="$TEMP_DIR/deps_${cache_key}_$$.txt"
                 zcat "$cache_file" 2>/dev/null | awk '
-                    BEGIN { RS="\n\n"; FS="\n" }
+                    BEGIN {
+                        RS = "\n\n"
+                        FS = "\n"
+                    }
                     {
                         package = ""
                         depends = ""
-                        for (i=1; i<=NF; i++) {
+                        for (i = 1; i <= NF; i++) {
                             if ($i ~ /^Package: /) {
                                 package = substr($i, 10)
                             }
-                            if ($i ~ /^Depends: /) {
+                            else if ($i ~ /^Depends: /) {
                                 depends = substr($i, 10)
-                                # Remove version constraints and alternatives
-                                gsub(/\([^)]*\)/, "", depends)
-                                gsub(/\|[^,]*/, "", depends)
-                                gsub(/[ \t]+/, " ", depends)
+                                # Optimized dependency cleaning in single pass
+                                gsub(/\([^)]*\)/, "", depends)           # Remove version constraints
+                                gsub(/\|[^,]*/, "", depends)            # Remove alternatives
+                                gsub(/[ \t\n\r]+/, " ", depends)        # Normalize whitespace
+                                gsub(/^ +| +$/, "", depends)            # Trim
                             }
                         }
                         if (package != "" && depends != "") {
                             print package ":" depends
                         }
                     }
-                ' | while IFS=: read -r pkg deps; do
-                    local safe_pkg=$(echo "$pkg" | sed 's|[^a-zA-Z0-9._-]|_|g')
-                    ALL_PACKAGES_DEPS["$safe_pkg"]="$deps"
-                done
+                ' > "$temp_deps"
+
+                # Batch load into associative array (much faster than loop)
+                while IFS=: read -r pkg deps; do
+                    if [[ -n "$pkg" && -n "$deps" ]]; then
+                        local safe_pkg=$(echo "$pkg" | tr -cd 'a-zA-Z0-9._-')
+                        ALL_PACKAGES_DEPS["$safe_pkg"]="$deps"
+                    fi
+                done < "$temp_deps"
+
+                rm -f "$temp_deps"
             fi
         done
     done
@@ -762,7 +774,7 @@ download_packages() {
     # Initialize with user-requested packages
     packages_to_download=("${PACKAGES[@]}")
 
-    # Skip preloading (too slow) - use on-demand resolution instead
+    # Skip preloading - use on-demand resolution for better memory efficiency
     # preload_packages_metadata "${REPOSITORIES[@]}"
 
     log "Resolving dependencies for ${#PACKAGES[@]} initial packages..."
@@ -786,22 +798,24 @@ download_packages() {
             fi
         done
 
-        # Resolve dependencies iteratively
+        # Optimized iterative dependency resolution
         local iteration=0
-        local max_iterations=10
+        local max_iterations=15  # Increased from 10 for complex dependency chains
+        declare -A resolved_packages
 
         while [[ ${#packages_to_download[@]} -gt 0 && $iteration -lt $max_iterations ]]; do
             iteration=$((iteration + 1))
-            log "  Dependency resolution iteration $iteration"
+            log "  Dependency resolution iteration $iteration (${#packages_to_download[@]} packages)"
 
             local new_dependencies=()
 
             for package in "${packages_to_download[@]}"; do
                 # Skip if already processed
-                if [[ " ${processed_packages[@]} " =~ " ${package} " ]]; then
+                if [[ -n "${resolved_packages[$package]}" ]]; then
                     continue
                 fi
 
+                resolved_packages["$package"]=1
                 processed_packages+=("$package")
                 log "    Resolving dependencies for: $package"
 
@@ -810,7 +824,7 @@ download_packages() {
                     local deps=$(resolve_dependencies_from_file "$package" "$packages_file")
                     if [[ -n "$deps" ]]; then
                         while IFS= read -r dep; do
-                            if [[ -n "$dep" && ! " ${processed_packages[@]} " =~ " ${dep} " ]]; then
+                            if [[ -n "$dep" && -z "${resolved_packages[$dep]}" ]]; then
                                 new_dependencies+=("$dep")
                                 log "      Found dependency: $dep"
                             fi
@@ -822,17 +836,31 @@ download_packages() {
             # Remove duplicates and update packages_to_download
             packages_to_download=()
             for dep in "${new_dependencies[@]}"; do
-                if [[ ! " ${processed_packages[@]} " =~ " ${dep} " ]]; then
+                if [[ -z "${resolved_packages[$dep]}" ]]; then
                     packages_to_download+=("$dep")
                 fi
             done
 
-            # Remove duplicates
+            # Remove duplicates efficiently
             if [[ ${#packages_to_download[@]} -gt 0 ]]; then
-                IFS=$'\n' packages_to_download=($(printf '%s\n' "${packages_to_download[@]}" | sort -u))
+                # Use associative array for deduplication
+                declare -A seen_deps
+                local temp_packages=()
+                for dep in "${packages_to_download[@]}"; do
+                    if [[ -z "${seen_deps[$dep]}" ]]; then
+                        seen_deps["$dep"]=1
+                        temp_packages+=("$dep")
+                    fi
+                done
+                packages_to_download=("${temp_packages[@]}")
                 log "    Found ${#packages_to_download[@]} new dependencies to resolve"
+                unset seen_deps
             fi
         done
+
+        if [[ $iteration -eq $max_iterations ]]; then
+            warning "Dependency resolution stopped at maximum iteration $max_iterations (possible circular dependencies)"
+        fi
 
         # Clean up temporary packages files
         rm -f "$TEMP_DIR"/Packages_*_$$.gz
