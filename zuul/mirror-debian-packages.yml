@@ -25,6 +25,6 @@
           set -x
 
           version=$(date +%Y%m%d)
-          docker push "quay.io/osism-packages/ubuntu-noble:$version"
+          docker push "quay.io/osism-mirror/ubuntu-noble:$version"
       when: _publish | default(false) | bool
       changed_when: true
