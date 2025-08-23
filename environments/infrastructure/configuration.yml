@@ -30,6 +30,12 @@ httpd_sonic_ztp_authorized_keys:
 
 httpd_ironic_enable: true
 
+#########################################################
+# repository
+
+httpd_data_enable: false
+httpd_data_image: registry.osism.tech/osism/packages/ubuntu-noble:latest
+
 ##########################################################
 # netbox
 

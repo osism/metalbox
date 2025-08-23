@@ -30,31 +30,32 @@
 5. Run `deploy-netbox.sh` to deploy the NetBox service.
 6. Run `netbox-manage.sh` to initialise the NetBox service.
 7. Set the managed site by running `netbox-site.sh SITE`
-   (replace `SITE` with the slug name of the site managed by this Metalbox)
+   (replace `SITE` with the slug name of the site managed by this Metalbox).
 8. Run `deploy-manager.sh` to deploy the OSISM manager service.
-9. Run `osism sync inventory` to sync the inventory
-10. Run `osism apply hosts` to sync the `/etc/hosts` file
-11. Run `osism apply network` to sync the network configuration
-12. Run `osism apply facts` to sync the facts
-13. Run `osism apply chrony` to sync the NTP configuration
+9. Run `osism sync inventory` to sync the inventory.
+10. Run `osism apply hosts` to sync the `/etc/hosts` file.
+11. Run `osism apply network` to sync the network configuration.
+12. Run `osism apply facts` to sync the facts.
+13. Run `osism apply chrony` to sync the NTP configuration.
 14. Use the file `sonic-export.img` as virtual media (vHDD).
-15. Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards remove the virtual
+15. Run `enable-repository.sh` to use the Metalbox as Ubuntu repository server.
+16. Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards remove the virtual
     media (vHDD).
-16. Run `deploy-infrastructure.sh` to deploy the infrastructure services
-17. Run `deploy-openstack.sh` to Deploy the OpenStack services
-18. Upload the Ironic image files to `/opt/httpd/data/root`
-19. Run `osism sync ironic` to sync the baremetal nodes
+17. Run `deploy-infrastructure.sh` to deploy the infrastructure services.
+18. Run `deploy-openstack.sh` to Deploy the OpenStack services.
+19. Upload the Ironic image files to `/opt/httpd/data/root`.
+20. Run `osism sync ironic` to sync the baremetal nodes.
 
 ## Update of the NetBox data
 
 1. Export the NetBox configuration repository with `netbox-manager export-archive -i`.
    When using a NetBox configuration repository provided by us, the file can be downloaded
    from GitHub after a trigger of the `Run export` action. Copy `netbox-export.img` to
-   `/home/dragon` on the Metalbox node
-2. Run `mount-images.sh` to mount the `netbox-export.img` image
-3. Run `netbox-import.sh` to sync the files in `/opt/configuration/netbox`
-4. Run `unmount-images.sh` to unmount the `netbox-export.img` image
-5. Run `netbox-manage.sh` to sync netbox with the state in `/opt/configuration/netbox`
+   `/home/dragon` on the Metalbox node.
+2. Run `mount-images.sh` to mount the `netbox-export.img` image.
+3. Run `netbox-import.sh` to sync the files in `/opt/configuration/netbox`.
+4. Run `unmount-images.sh` to unmount the `netbox-export.img` image.
+5. Run `netbox-manage.sh` to sync netbox with the state in `/opt/configuration/netbox`.
 
 ## Update of the Ironic images
 
