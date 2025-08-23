@@ -5,6 +5,7 @@
   vars:
     _publish: "{{ publish | default(False) }}"
     docker_registry: quay.io
+    minio_url: https://swift.services.a.regiocloud.tech
 
   tasks:
     - name: Run mirror script
@@ -24,7 +25,7 @@
       when: _publish | default(false) | bool
       no_log: true
 
-    - name: Run push script
+    - name: Run push and upload script
       ansible.builtin.shell:
         executable: /bin/bash
         chdir: "{{ zuul.project.src_dir | default('.') }}"
@@ -35,5 +36,16 @@
 
           version=$(date +%Y%m%d)
           docker push "quay.io/osism-mirror/ubuntu-noble:$version"
+
+          docker tag "quay.io/osism-mirror/ubuntu-noble:$version" registry.osism.tech/osism/packages/ubuntu-noble:latest
+          docker save registry.osism.tech/osism/packages/ubuntu-noble:latest | bzip2 > ubuntu-noble.tar.bz2
+
+          wget https://dl.min.io/client/mc/release/linux-amd64/mc
+          chmod +x mc
+          ./mc alias set minio {{ minio_url }} {{ secret.MINIO_ACCESS_KEY | trim }} {{ secret.MINIO_SECRET_KEY | trim }}
+          sha256sum ubuntu-noble.tar.bz2 ubuntu-noble.tar.bz2.CHECKSUM
+          ./mc cp ubuntu-noble.tar.bz2.CHECKSUM minio/metalbox
+          ./mc cp ubuntu-noble.tar.bz2 minio/metalbox
       when: _publish | default(false) | bool
       changed_when: true
+      no_log: true
