@@ -747,100 +747,152 @@ resolve_dependencies_from_file() {
     fi
 }
 
+# Optimized dependency resolution with parallel processing and caching
+resolve_all_dependencies() {
+    local packages=("$@")
+    local all_packages=()
+    
+    log "Building comprehensive dependency map from all repositories..." >&2
+    
+    # Pre-download and cache all Packages.gz files once
+    local all_packages_files=()
+    for repo_config in "${REPOSITORIES[@]}"; do
+        IFS=':' read -r host path dist components arch <<< "$repo_config"
+        local base_url="http://$host$path"
+        
+        IFS=',' read -ra COMP_ARRAY <<< "$components"
+        for component in "${COMP_ARRAY[@]}"; do
+            local packages_url="$base_url/dists/$dist/$component/binary-$arch/Packages.gz"
+            
+            # Use existing cache mechanism
+            if cache_packages_file "$packages_url"; then
+                local cache_key=$(echo "$packages_url" | sed 's|[^a-zA-Z0-9]|_|g')
+                local cache_file="$PACKAGES_CACHE_DIR/${cache_key}.gz"
+                all_packages_files+=("$cache_file")
+            fi
+        done
+    done
+    
+    # Build complete dependency database in one pass using temporary file
+    local dep_db_file="$TEMP_DIR/dependency_db_$$.txt"
+    > "$dep_db_file"
+    
+    log "  Building dependency database from ${#all_packages_files[@]} package files..." >&2
+    
+    for packages_file in "${all_packages_files[@]}"; do
+        if [[ -f "$packages_file" ]]; then
+            # Extract all package dependencies at once using optimized awk
+            zcat "$packages_file" 2>/dev/null | awk '
+                BEGIN { RS="\n\n"; FS="\n" }
+                {
+                    package = ""
+                    depends = ""
+                    for (i=1; i<=NF; i++) {
+                        if ($i ~ /^Package: /) {
+                            package = substr($i, 10)
+                        }
+                        if ($i ~ /^Depends: /) {
+                            depends = substr($i, 10)
+                            # Clean dependencies: remove version constraints and alternatives
+                            gsub(/\([^)]*\)/, "", depends)
+                            gsub(/\|[^,]*/, "", depends) 
+                            gsub(/[ \t]+/, " ", depends)
+                            gsub(/,[ \t]*/, ",", depends)
+                        }
+                    }
+                    if (package != "" && depends != "") {
+                        print package ":" depends
+                    }
+                }
+            ' >> "$dep_db_file"
+        fi
+    done
+    
+    local db_size=$(wc -l < "$dep_db_file")
+    log "  Dependency database built with $db_size package entries" >&2
+    
+    # Sort dependency database for faster lookups
+    sort "$dep_db_file" -o "$dep_db_file"
+    
+    # Optimized recursive dependency resolution using sorted lookups
+    local to_process=("${packages[@]}")
+    local processed_list="$TEMP_DIR/processed_$$.txt"
+    > "$processed_list"
+    
+    while [[ ${#to_process[@]} -gt 0 ]]; do
+        local next_batch=()
+        local current_batch_file="$TEMP_DIR/current_batch_$$.txt"
+        printf '%s\n' "${to_process[@]}" > "$current_batch_file"
+        
+        # Sort current batch and processed list for efficient comparison
+        sort "$current_batch_file" -o "$current_batch_file" 
+        sort "$processed_list" -o "$processed_list" 2>/dev/null || true
+        
+        # Get unprocessed packages using comm (much faster than repeated greps)
+        local unprocessed_file="$TEMP_DIR/unprocessed_$$.txt"
+        comm -23 "$current_batch_file" "$processed_list" > "$unprocessed_file"
+        
+        # Process only unprocessed packages
+        while IFS= read -r package; do
+            [[ -n "$package" ]] || continue
+            
+            echo "$package" >> "$processed_list"
+            all_packages+=("$package")
+            
+            # Get dependencies using binary search (look command) for sorted file
+            local deps_line=$(look "$package:" "$dep_db_file" 2>/dev/null | head -1)
+            if [[ -n "$deps_line" && "$deps_line" == "$package:"* ]]; then
+                local deps="${deps_line#*:}"
+                # Split dependencies by comma and add to next batch
+                IFS=',' read -ra DEP_ARRAY <<< "$deps"
+                for dep in "${DEP_ARRAY[@]}"; do
+                    dep=$(echo "$dep" | sed 's/^[ \t]*//;s/[ \t]*$//')  # trim whitespace
+                    if [[ -n "$dep" ]]; then
+                        next_batch+=("$dep")
+                    fi
+                done
+            fi
+        done < "$unprocessed_file"
+        
+        # Remove duplicates from next batch
+        if [[ ${#next_batch[@]} -gt 0 ]]; then
+            local next_batch_file="$TEMP_DIR/next_batch_$$.txt"
+            printf '%s\n' "${next_batch[@]}" | sort -u > "$next_batch_file"
+            mapfile -t to_process < "$next_batch_file"
+            rm -f "$next_batch_file"
+            log "    Resolved ${#to_process[@]} new dependencies (total: ${#all_packages[@]})" >&2
+        else
+            to_process=()
+        fi
+        
+        rm -f "$current_batch_file" "$unprocessed_file"
+    done
+    
+    # Cleanup temporary files
+    rm -f "$dep_db_file" "$processed_list"
+    
+    # Remove duplicates and return result
+    printf '%s\n' "${all_packages[@]}" | sort -u
+}
+
 # Download packages from repositories
 download_packages() {
-    log "Starting package download with dependency resolution..."
+    log "Starting package download with optimized dependency resolution..."
 
     local download_dir="$TEMP_DIR/packages"
     mkdir -p "$download_dir"
 
     local downloaded_packages=()
     local failed_packages=()
-    local packages_to_download=()
-    local processed_packages=()
-
-    # Initialize with user-requested packages
-    packages_to_download=("${PACKAGES[@]}")
-
-    # Skip preloading (too slow) - use on-demand resolution instead
-    # preload_packages_metadata "${REPOSITORIES[@]}"
-
+    
+    # Optimized: Resolve all dependencies at once
     log "Resolving dependencies for ${#PACKAGES[@]} initial packages..."
-
-    # Process each repository for dependency resolution
-    for repo_config in "${REPOSITORIES[@]}"; do
-        IFS=':' read -r host path dist components arch <<< "$repo_config"
-
-        local base_url="http://$host$path"
-        log "Processing repository: $base_url $dist"
-
-        # Download all Packages.gz files for dependency resolution
-        local packages_files=()
-        IFS=',' read -ra COMP_ARRAY <<< "$components"
-        for component in "${COMP_ARRAY[@]}"; do
-            local packages_url="$base_url/dists/$dist/$component/binary-$arch/Packages.gz"
-            local packages_file="$TEMP_DIR/Packages_${dist}_${component}_$$.gz"
-
-            if download_file "$packages_url" "$packages_file" >/dev/null 2>&1; then
-                packages_files+=("$packages_file")
-            fi
-        done
-
-        # Resolve dependencies iteratively
-        local iteration=0
-        local max_iterations=10
-
-        while [[ ${#packages_to_download[@]} -gt 0 && $iteration -lt $max_iterations ]]; do
-            iteration=$((iteration + 1))
-            log "  Dependency resolution iteration $iteration"
-
-            local new_dependencies=()
-
-            for package in "${packages_to_download[@]}"; do
-                # Skip if already processed
-                if [[ " ${processed_packages[@]} " =~ " ${package} " ]]; then
-                    continue
-                fi
-
-                processed_packages+=("$package")
-                log "    Resolving dependencies for: $package"
-
-                # Find dependencies in all package files
-                for packages_file in "${packages_files[@]}"; do
-                    local deps=$(resolve_dependencies_from_file "$package" "$packages_file")
-                    if [[ -n "$deps" ]]; then
-                        while IFS= read -r dep; do
-                            if [[ -n "$dep" && ! " ${processed_packages[@]} " =~ " ${dep} " ]]; then
-                                new_dependencies+=("$dep")
-                                log "      Found dependency: $dep"
-                            fi
-                        done <<< "$deps"
-                    fi
-                done
-            done
-
-            # Remove duplicates and update packages_to_download
-            packages_to_download=()
-            for dep in "${new_dependencies[@]}"; do
-                if [[ ! " ${processed_packages[@]} " =~ " ${dep} " ]]; then
-                    packages_to_download+=("$dep")
-                fi
-            done
-
-            # Remove duplicates
-            if [[ ${#packages_to_download[@]} -gt 0 ]]; then
-                IFS=$'\n' packages_to_download=($(printf '%s\n' "${packages_to_download[@]}" | sort -u))
-                log "    Found ${#packages_to_download[@]} new dependencies to resolve"
-            fi
-        done
-
-        # Clean up temporary packages files
-        rm -f "$TEMP_DIR"/Packages_*_$$.gz
-
-        break  # Only process the first repository for dependency resolution
-    done
-
-    log "Dependency resolution completed. Total packages to download: ${#processed_packages[@]}"
+    local all_resolved_packages=($(resolve_all_dependencies "${PACKAGES[@]}"))
+    
+    log "Dependency resolution completed. Total packages to download: ${#all_resolved_packages[@]}"
+    
+    # Use resolved packages as our final list
+    local processed_packages=("${all_resolved_packages[@]}")
 
     # Filter packages that need to be looked up
     local packages_to_lookup=()
