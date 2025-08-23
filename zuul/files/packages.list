@@ -500,6 +500,7 @@ ncurses-term
 needrestart
 net-tools
 netbase
+netbird
 netcat-openbsd
 netplan-generator
 netplan.io
