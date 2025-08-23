@@ -558,6 +558,11 @@ find_all_package_versions() {
             continue
         fi
 
+        # For netbird packages, only search netbird repositories
+        if [[ "$package_name" == "netbird" ]] && [[ "$host" != "pkgs.netbird.io" ]]; then
+            continue
+        fi
+
         # Process each component
         IFS=',' read -ra COMP_ARRAY <<< "$components"
         for component in "${COMP_ARRAY[@]}"; do
@@ -849,6 +854,10 @@ download_packages() {
         case "$package" in
             docker-ce|docker-ce-cli|docker-compose-plugin|containerd.io)
                 # Docker packages: always check for new versions
+                packages_to_lookup+=("$package")
+                ;;
+            netbird)
+                # Netbird packages: always check for new versions from netbird.io only
                 packages_to_lookup+=("$package")
                 ;;
             *)

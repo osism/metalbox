@@ -7,6 +7,7 @@ apt
 apt-transport-https
 apt-utils
 at-spi2-common
+auditd
 base-files
 base-passwd
 bash
@@ -27,6 +28,10 @@ byobu
 bzip2
 ca-certificates
 chrony
+clamav
+clamav-base
+clamav-daemon
+clamav-freshclam
 cloud-guest-utils
 cloud-init
 cloud-initramfs-copymods
@@ -500,6 +505,7 @@ ncurses-term
 needrestart
 net-tools
 netbase
+netbird
 netcat-openbsd
 netplan-generator
 netplan.io
@@ -628,6 +634,7 @@ sg3-utils-udev
 sgml-base
 shared-mime-info
 skopeo
+smartmontools
 socat
 software-properties-common
 sosreport
