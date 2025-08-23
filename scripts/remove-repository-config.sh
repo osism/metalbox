@@ -2,7 +2,7 @@
 
 # Script to remove repository configuration block from environments/configuration.yml
 
-CONFIG_FILE="environments/configuration.yml"
+CONFIG_FILE="/opt/configuration/environments/configuration.yml"
 
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "Error: $CONFIG_FILE not found!"
