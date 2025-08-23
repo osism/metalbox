@@ -17,6 +17,8 @@
    * [osism-node.qcow2](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-node.qcow2)
    * [osism-node.qcow2.CHECKSUM](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-node.qcow2.CHECKSUM)
    * [osism-esp.raw](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-esp.raw)
+6. Download the Ubuntu repository archive
+   [ubuntu-noble.tar.bz2](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/metalbox/ubuntu-noble.tar.bz2)
 
 ## Installation
 
@@ -38,7 +40,8 @@
 12. Run `osism apply facts` to sync the facts.
 13. Run `osism apply chrony` to sync the NTP configuration.
 14. Use the file `sonic-export.img` as virtual media (vHDD).
-15. Run `update-repository.sh` to use the Metalbox as Ubuntu repository server.
+15. Copy `ubuntu-noble.tar.bz2` to `/home/dragon` and run `update-repository.sh` to use
+    the Metalbox as Ubuntu repository server.
 16. Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards remove the virtual
     media (vHDD).
 17. Run `deploy-infrastructure.sh` to deploy the infrastructure services.
