@@ -87,6 +87,18 @@
 
 1. Run `update-registry.sh` to update the container registry
 
+## Update of the Ubuntu repository
+
+### Without external connectivity
+
+1. Download [ubuntu-noble.tar.bz2](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/metalbox/ubuntu-noble.tar.bz2)
+2. Copy `ubuntu-noble.tar.bz2` to `/home/dragon` on the Metalbox node
+3. Run `SKIP_DOWNLOAD=true update-repository.sh` to update the Ubuntu repository
+
+### With external connectivity
+
+1. Run `update-repository.sh` to update the Ubuntu repository
+
 ## Service updates
 
 ### Update of the manager service
