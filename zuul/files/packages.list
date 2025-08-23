@@ -502,6 +502,7 @@ net-tools
 netbase
 netbird
 netcat-openbsd
+netdata
 netplan-generator
 netplan.io
 networkd-dispatcher
