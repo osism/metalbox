@@ -38,8 +38,7 @@
 12. Run `osism apply facts` to sync the facts.
 13. Run `osism apply chrony` to sync the NTP configuration.
 14. Use the file `sonic-export.img` as virtual media (vHDD).
-15. Run `enable-repository.sh` followed by `update-repository.sh` to use the Metalbox as Ubuntu
-    repository server.
+15. Run `update-repository.sh` to use the Metalbox as Ubuntu repository server.
 16. Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards remove the virtual
     media (vHDD).
 17. Run `deploy-infrastructure.sh` to deploy the infrastructure services.
