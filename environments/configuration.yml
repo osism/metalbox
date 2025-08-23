@@ -38,3 +38,15 @@ chrony_minimum_number_of_servers: 1
 
 # frr
 frr_dummy_interface: loopback0
+
+# repository
+docker_configure_repository: false
+netbird_configure_repository: false
+netdata_configure_repository: false
+
+repositories:
+  - name: stable
+    deb822_uris: http://localhost/ubuntu-noble/
+    deb822_components: main
+    deb822_signed_by: ""
+    deb822_trusted: "yes"
