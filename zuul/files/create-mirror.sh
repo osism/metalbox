@@ -389,7 +389,7 @@ parallel_package_lookups() {
     printf '%s\n' "${packages[@]}" > "$package_list"
 
     # Export functions and variables needed by subprocesses
-    export -f parallel_package_lookup find_best_package find_package_info find_all_package_versions version_compare download_file cache_packages_file
+    export -f parallel_package_lookup find_best_package find_package_info find_all_package_versions find_latest_netbird_version version_compare download_file cache_packages_file
     export TEMP_DIR PACKAGES_CACHE_DIR
     export -A PACKAGES_METADATA_CACHE
 
@@ -542,6 +542,71 @@ version_compare() {
     fi
 }
 
+# Find latest version of Netbird package only
+find_latest_netbird_version() {
+    local package_name="$1"
+    local repo_configs=("${@:2}")
+
+    local latest_version=""
+    local latest_url=""
+
+    for repo_config in "${repo_configs[@]}"; do
+        IFS=':' read -r host path dist components arch <<< "$repo_config"
+        local base_url="http://$host$path"
+
+        # Process each component
+        IFS=',' read -ra COMP_ARRAY <<< "$components"
+        for component in "${COMP_ARRAY[@]}"; do
+            local packages_url="$base_url/dists/$dist/$component/binary-$arch/Packages.gz"
+            local packages_file="$TEMP_DIR/Packages_$(basename "$packages_url" .gz)_$$.gz"
+
+            if download_file "$packages_url" "$packages_file" >/dev/null 2>&1; then
+                # Extract all versions and find the latest
+                local package_infos=$(zcat "$packages_file" 2>/dev/null | awk -v pkg="$package_name" '
+                    BEGIN { RS="\n\n"; FS="\n" }
+                    $1 ~ "^Package: " pkg "$" {
+                        filename = ""
+                        version = ""
+                        for (i=1; i<=NF; i++) {
+                            if ($i ~ /^Filename: /) {
+                                filename = substr($i, 11)
+                            }
+                            if ($i ~ /^Version: /) {
+                                version = substr($i, 10)
+                            }
+                        }
+                        if (filename != "" && version != "") {
+                            print version "|" filename
+                        }
+                    }
+                ')
+
+                if [[ -n "$package_infos" ]]; then
+                    while IFS= read -r package_info; do
+                        if [[ -n "$package_info" ]]; then
+                            local version=$(echo "$package_info" | cut -d'|' -f1)
+                            local filename=$(echo "$package_info" | cut -d'|' -f2)
+                            
+                            # Compare versions and keep the latest
+                            if [[ -z "$latest_version" ]] || [[ $(version_compare "$version" "$latest_version") -eq 1 ]]; then
+                                latest_version="$version"
+                                latest_url="$base_url/$filename"
+                            fi
+                        fi
+                    done <<< "$package_infos"
+                fi
+
+                rm -f "$packages_file"
+            fi
+        done
+    done
+
+    # Return only the latest version URL
+    if [[ -n "$latest_url" ]]; then
+        echo "$latest_url"
+    fi
+}
+
 # Find all versions of a package (for Docker packages)
 find_all_package_versions() {
     local package_name="$1"
@@ -614,6 +679,11 @@ find_best_package() {
     case "$package_name" in
         docker-ce|docker-ce-cli|docker-compose-plugin|containerd.io)
             find_all_package_versions "$package_name" "${repo_configs[@]}"
+            return
+            ;;
+        netbird)
+            # Netbird: get only the latest version
+            find_latest_netbird_version "$package_name" "${repo_configs[@]}"
             return
             ;;
     esac
@@ -1087,8 +1157,6 @@ cleanup() {
 # Build container image
 build_container_image() {
     log "Building container image..."
-
-    ls -la /tmp/repository
 
     # Check if docker/podman is available
     local container_cmd=""
