@@ -20,7 +20,7 @@ osism_api_host: 0.0.0.0
 ##########################################################
 # ara-server
 
-ara_server_host: 192.168.42.10
+ara_server_host: 0.0.0.0
 
 ##########################################################
 # listener
@@ -41,6 +41,8 @@ manager_service_allow_restart: false
 # frontend
 
 enable_frontend: true
+frontend_host: 0.0.0.0
+frontend_osism_api_url: http://metalbox:8000
 
 ##########################################################
 # watchdog
