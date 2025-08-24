@@ -9,8 +9,6 @@ if [ ! -f "$CONFIG_FILE" ]; then
     exit 1
 fi
 
-# Create backup
-cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
 
 # Use sed to remove the repository configuration block
 sed -i.tmp '
@@ -38,4 +36,3 @@ sed -i.tmp '
 rm -f "${CONFIG_FILE}.tmp"
 
 echo "Repository configuration block removed from $CONFIG_FILE"
-echo "Backup saved as ${CONFIG_FILE}.backup"
