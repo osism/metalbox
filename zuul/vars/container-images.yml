@@ -23,7 +23,7 @@ images_manager:
   - rsync:latest
   - seed:latest
 
-images_kolla:
+images_kolla_metalbox:
   - cron:2024.2
   - ironic-api:2024.2
   - ironic-conductor:2024.2
@@ -39,3 +39,52 @@ images_kolla:
   - rabbitmq:2024.2
   - redis-sentinel:2024.2
   - redis:2024.2
+
+images_kolla:
+  - ceilometer-central:2024.2
+  - ceilometer-compute:2024.2
+  - ceilometer-notification:2024.2
+  - cinder-api:2024.2
+  - cinder-backup:2024.2
+  - cinder-scheduler:2024.2
+  - cinder-volume:2024.2
+  - designate-api:2024.2
+  - designate-backend-bind9:2024.2
+  - designate-central:2024.2
+  - designate-producer:2024.2
+  - designate-worker:2024.2
+  - fluentd:2024.2
+  - glance-api:2024.2
+  - haproxy-ssh:2024.2
+  - haproxy:2024.2
+  - horizon:2024.2
+  - iscsid:2024.2
+  - keepalived:2024.2
+  - multipathd:2024.2
+  - neutron-metadata-agent:2024.2
+  - neutron-server:2024.2
+  - nova-api:2024.2
+  - nova-compute:2024.2
+  - nova-conductor:2024.2
+  - nova-libvirt:2024.2
+  - nova-novncproxy:2024.2
+  - nova-scheduler:2024.2
+  - nova-ssh:2024.2
+  - octavia-api:2024.2
+  - octavia-driver-agent:2024.2
+  - octavia-health-manager:2024.2
+  - octavia-housekeeping:2024.2
+  - octavia-worker:2024.2
+  - opensearch-dashboards:2024.2
+  - opensearch:2024.2
+  - openvswitch-db-server:2024.2
+  - openvswitch-vswitchd:2024.2
+  - ovn-controller:2024.2
+  - ovn-nb-db-server:2024.2
+  - ovn-northd:2024.2
+  - ovn-sb-db-server:2024.2
+  - placement-api:2024.2
+  - proxysql:2024.2
+  - skyline-apiserver:2024.2
+  - skyline-console:2024.2
+  - tgtd:2024.2
