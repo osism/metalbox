@@ -17,8 +17,6 @@
    * [osism-node.qcow2](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-node.qcow2)
    * [osism-node.qcow2.CHECKSUM](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-node.qcow2.CHECKSUM)
    * [osism-esp.raw](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-esp.raw)
-6. Download the Ubuntu repository archive
-   [ubuntu-noble.tar.bz2](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/metalbox/ubuntu-noble.tar.bz2)
 
 ## Installation
 
@@ -40,16 +38,32 @@
 12. Run `osism apply facts` to sync the facts.
 13. Run `osism apply chrony` to sync the NTP configuration.
 14. Use the file `sonic-export.img` as virtual media (vHDD).
-15. Copy `ubuntu-noble.tar.bz2` to `/home/dragon` and run `update-repository.sh` to use
-    the Metalbox as Ubuntu repository server.
-16. Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards remove the virtual
+15. Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards remove the virtual
     media (vHDD).
-17. Run `deploy-infrastructure.sh` to deploy the infrastructure services.
-18. Run `deploy-openstack.sh` to Deploy the OpenStack services.
-19. Upload the Ironic image files to `/opt/httpd/data/root`.
-20. Run `osism sync ironic` to sync the baremetal nodes.
+16. Run `deploy-infrastructure.sh` to deploy the infrastructure services.
+17. Run `deploy-openstack.sh` to Deploy the OpenStack services.
+18. Upload the Ironic image files to `/opt/httpd/data/root`.
+19. Run `osism sync ironic` to sync the baremetal nodes.
 
-## Update of the NetBox data
+### Optional steps
+
+#### Using the Metalbox as an Ubuntu repository server
+
+1. Download the Ubuntu repository archive
+   [ubuntu-noble.tar.bz2](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/metalbox/ubuntu-noble.tar.bz2)
+2. Copy `ubuntu-noble.tar.bz2` to `/home/dragon` on the Metalbox node
+3. Run `update-repository.sh` to import the Ubuntu repository files
+
+#### Using Metalbox as a full container registry
+
+1. Download [registry-full.tar.bz2](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/metalbox/registry-full.tar.bz2)
+2. Rename `registry-full.tar.bz2` to `registry.tar.bz2`
+3. Copy `registry.tar.bz2` to `/home/dragon` on the Metalbox node
+4. Run `SKIP_DOWNLOAD=true update-registry.sh` to update the container registry
+
+## Data updates
+
+### Update of the NetBox data
 
 1. Export the NetBox configuration repository with `netbox-manager export-archive -i`.
    When using a NetBox configuration repository provided by us, the file can be downloaded
@@ -60,9 +74,9 @@
 4. Run `unmount-images.sh` to unmount the `netbox-export.img` image.
 5. Run `netbox-manage.sh` to sync netbox with the state in `/opt/configuration/netbox`.
 
-## Update of the Ironic images
+### Update of the Ironic images
 
-### Without external connectivity
+#### Without external connectivity
 
 1. Download the Ironic images:
    * [osism-ipa.initramfs](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-ipa.initramfs)
@@ -73,31 +87,31 @@
 2. Copy the downloaded files to `/home/dragon` on the Metalbox node
 3. Run `SKIP_DOWNLOAD=true update-ironic-images.sh` to update the Ironic images
 
-### With external connectivity
+#### With external connectivity
 
 1. Run `update-ironic-images.sh` to update the Ironic images
 
-## Update of the container registry
+### Update of the container registry
 
-### Without external connectivity
+#### Without external connectivity
 
 1. Download [registry.tar.bz2](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/metalbox/registry.tar.bz2)
 2. Copy `registry.tar.bz2` to `/home/dragon` on the Metalbox node
 3. Run `SKIP_DOWNLOAD=true update-registry.sh` to update the container registry
 
-### With external connectivity
+#### With external connectivity
 
 1. Run `update-registry.sh` to update the container registry
 
-## Update of the Ubuntu repository
+### Update of the Ubuntu repository files
 
-### Without external connectivity
+#### Without external connectivity
 
 1. Download [ubuntu-noble.tar.bz2](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/metalbox/ubuntu-noble.tar.bz2)
 2. Copy `ubuntu-noble.tar.bz2` to `/home/dragon` on the Metalbox node
-3. Run `SKIP_DOWNLOAD=true update-repository.sh` to update the Ubuntu repository
+3. Run `SKIP_DOWNLOAD=true update-repository.sh` to update the Ubuntu repository files
 
-### With external connectivity
+#### With external connectivity
 
 1. Run `update-repository.sh` to update the Ubuntu repository
 

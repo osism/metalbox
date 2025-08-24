@@ -72,6 +72,12 @@
       - "^zuul/vars/container-images.yml"
 
 - job:
+    name: metalbox-mirror-container-images-full
+    parent: metalbox-mirror-container-images
+    vars:
+      full: true
+
+- job:
     name: metalbox-mirror-debian-packages-publish
     parent: metalbox-mirror-debian-packages
     vars:
@@ -91,12 +97,24 @@
         secret: SECRET_METALBOX
         pass-to-parent: true
 
+- job:
+    name: metalbox-mirror-container-images-full-publish
+    parent: metalbox-mirror-container-images
+    vars:
+      full: true
+      publish: true
+    secrets:
+      - name: secret
+        secret: SECRET_METALBOX
+        pass-to-parent: true
+
 - project:
     merge-mode: squash-merge
     default-branch: main
     check:
       jobs:
         - metalbox-mirror-container-images
+        - metalbox-mirror-container-images-full
         - metalbox-mirror-debian-packages
         - ansible-lint
         - yamllint
@@ -104,11 +122,14 @@
       jobs:
         - ansible-lint
         - metalbox-mirror-container-images-publish
+        - metalbox-mirror-container-images-full-publish
         - metalbox-mirror-debian-packages-publish
         - yamllint
     post:
       jobs:
         - metalbox-mirror-container-images-publish:
+            branches: main
+        - metalbox-mirror-container-images-full-publish:
             branches: main
         - metalbox-mirror-debian-packages-publish:
             branches: main
