@@ -84,6 +84,16 @@ images_kolla:
   - ovn-northd:2024.2
   - ovn-sb-db-server:2024.2
   - placement-api:2024.2
+  - prometheus-alertmanager:2024.2
+  - prometheus-blackbox-exporter:2024.2
+  - prometheus-cadvisor:2024.2
+  - prometheus-elasticsearch-exporter:2024.2
+  - prometheus-libvirt-exporter:2024.2
+  - prometheus-memcached-exporter:2024.2
+  - prometheus-mysqld-exporter:2024.2
+  - prometheus-node-exporter:2024.2
+  - prometheus-openstack-exporter:2024.2
+  - prometheus-ovn-exporter:2024.2
   - proxysql:2024.2
   - skyline-apiserver:2024.2
   - skyline-console:2024.2
