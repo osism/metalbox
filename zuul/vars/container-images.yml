@@ -3,6 +3,7 @@ images:
   - hashicorp/vault:1.19.5
   - library/httpd:alpine
   - library/mariadb:11.7.2
+  - library/mariadb:11.8.2
   - library/postgres:16.9-alpine
   - library/redis:7.4.4-alpine
   - library/traefik:v3.4.1
