@@ -56,6 +56,6 @@ TARBALL_FILENAME="$(basename "$TARBALL_PATH")"
 docker run --rm -v "$VOLUME_NAME":/volume -v "$TARBALL_DIR":/import:ro library/alpine:3 sh -c "cd /volume && tar xjf /import/$TARBALL_FILENAME"
 
 echo "Starting new registry container..."
-docker run -d -p 0.0.0.0:5000:5000 -v "$VOLUME_NAME":/var/lib/registry --name "$CONTAINER_NAME" --restart always library/registry:3
+docker run -d -p 0.0.0.0:5001:5000 -v "$VOLUME_NAME":/var/lib/registry --name "$CONTAINER_NAME" --restart always library/registry:3
 
 echo "Registry update completed successfully!"
