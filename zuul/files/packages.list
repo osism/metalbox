@@ -630,6 +630,7 @@ sg3-utils-udev
 sgml-base
 shared-mime-info
 skopeo
+smartmontools
 socat
 software-properties-common
 sosreport
