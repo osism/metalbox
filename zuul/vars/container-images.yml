@@ -57,6 +57,7 @@ images_kolla:
   - designate-worker:2024.2
   - fluentd:2024.2
   - glance-api:2024.2
+  - grafana:2024.2
   - haproxy-ssh:2024.2
   - haproxy:2024.2
   - horizon:2024.2
