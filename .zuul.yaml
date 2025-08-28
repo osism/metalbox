@@ -47,6 +47,18 @@
           SAOQMPgNluSZ4pYb2wxWqr3WehPPQZb+3aexCAdjocix1bPJl86CUm0qTAFC/uiSezjbU
           ZWX+FaMvPDtz19IZ/rTAIjR6KhIaHpN5VkjUvk24nIA0LgLC8D7Jn/ZW8MMxi0=
 
+- semaphore:
+    name: semaphore-metalbox-mirror-debian-packages-publish
+    max: 1
+
+- semaphore:
+    name: semaphore-metalbox-mirror-container-images-publish
+    max: 1
+
+- semaphore:
+    name: semaphore-metalbox-mirror-container-images-full-publish
+    max: 1
+
 - job:
     name: metalbox-mirror-debian-packages
     nodeset: ubuntu-noble-large
@@ -80,6 +92,8 @@
 - job:
     name: metalbox-mirror-debian-packages-publish
     parent: metalbox-mirror-debian-packages
+    semaphores:
+      - name: semaphore-metalbox-mirror-debian-packages-publish
     vars:
       publish: true
     secrets:
@@ -90,6 +104,8 @@
 - job:
     name: metalbox-mirror-container-images-publish
     parent: metalbox-mirror-container-images
+    semaphores:
+      - name: semaphore-metalbox-mirror-container-images-publish
     vars:
       publish: true
     secrets:
@@ -100,6 +116,8 @@
 - job:
     name: metalbox-mirror-container-images-full-publish
     parent: metalbox-mirror-container-images
+    semaphores:
+      - name: semaphore-metalbox-mirror-container-images-full-publish
     vars:
       full: true
       publish: true
