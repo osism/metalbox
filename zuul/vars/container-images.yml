@@ -11,6 +11,7 @@ images:
 
 images_manager:
   - ara-server:1.7.2
+  - dnsdist:1.9.8
   - dnsmasq-osism:2.90
   - gnmic:0.41.0
   - inventory-reconciler:latest
