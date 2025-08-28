@@ -586,7 +586,7 @@ find_latest_netbird_version() {
                         if [[ -n "$package_info" ]]; then
                             local version=$(echo "$package_info" | cut -d'|' -f1)
                             local filename=$(echo "$package_info" | cut -d'|' -f2)
-                            
+
                             # Compare versions and keep the latest
                             if [[ -z "$latest_version" ]] || [[ $(version_compare "$version" "$latest_version") -eq 1 ]]; then
                                 latest_version="$version"
@@ -817,6 +817,21 @@ resolve_dependencies_from_file() {
     fi
 }
 
+# Download additional direct URLs
+download_direct_urls() {
+    local download_dir="$1"
+
+    # Direct URLs for packages that should be included without dependencies
+    local direct_urls=(
+        "http://ftp.de.debian.org/debian/pool/main/p/python-docker/python3-docker_7.1.0-2_all.deb"
+    )
+
+    if [[ ${#direct_urls[@]} -gt 0 ]]; then
+        log "Downloading ${#direct_urls[@]} direct URLs..."
+        parallel_download_files "$download_dir" "${direct_urls[@]}"
+    fi
+}
+
 # Download packages from repositories
 download_packages() {
     log "Starting package download with dependency resolution..."
@@ -966,6 +981,9 @@ download_packages() {
         log "All packages already downloaded or no packages to lookup"
         local all_download_urls=()
     fi
+
+    # Download direct URLs first
+    download_direct_urls "$download_dir"
 
     # Perform parallel downloads if we have URLs to download
     if [[ ${#all_download_urls[@]} -gt 0 ]]; then

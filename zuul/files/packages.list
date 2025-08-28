@@ -563,7 +563,6 @@ python3-debian
 python3-distro
 python3-distro-info
 python3-distupgrade
-python3-docker
 python3-gdbm
 python3-gi
 python3-httplib2
