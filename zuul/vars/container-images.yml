@@ -52,6 +52,7 @@ images_kolla:
   - designate-api:2024.2
   - designate-backend-bind9:2024.2
   - designate-central:2024.2
+  - designate-mdns:2024.2
   - designate-producer:2024.2
   - designate-worker:2024.2
   - fluentd:2024.2
