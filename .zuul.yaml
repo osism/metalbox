@@ -86,6 +86,7 @@
 - job:
     name: metalbox-mirror-container-images-full
     parent: metalbox-mirror-container-images
+    timeout: 3600
     vars:
       full: true
 
@@ -118,6 +119,7 @@
     parent: metalbox-mirror-container-images
     semaphores:
       - name: semaphore-metalbox-mirror-container-images-full-publish
+    timeout: 3600
     vars:
       full: true
       publish: true
