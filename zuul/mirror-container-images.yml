@@ -7,7 +7,7 @@
 
   vars:
     docker_registry: registry.osism.tech
-    minio_url: https://swift.services.a.regiocloud.tech
+    minio_url: https://nbg1.your-objectstorage.com
     _publish: "{{ publish | default(False) }}"
     _full: "{{ full | default(False) }}"
 
@@ -103,8 +103,8 @@
         executable: /bin/bash
         cmd: |
           sha256sum registry.tar.bz2 > registry.tar.bz2.CHECKSUM
-          ./mc cp registry.tar.bz2.CHECKSUM minio/metalbox
-          ./mc cp registry.tar.bz2 minio/metalbox
+          ./mc cp registry.tar.bz2.CHECKSUM minio/osism/metalbox/
+          ./mc cp registry.tar.bz2 minio/osism/metalbox/
       when:
         - not _full | bool
         - _publish | bool
@@ -117,8 +117,8 @@
         cmd: |
           mv registry.tar.bz2 registry-full.tar.bz2
           sha256sum registry-full.tar.bz2 > registry-full.tar.bz2.CHECKSUM
-          ./mc cp registry-full.tar.bz2.CHECKSUM minio/metalbox
-          ./mc cp registry-full.tar.bz2 minio/metalbox
+          ./mc cp registry-full.tar.bz2.CHECKSUM minio/osism/metalbox/
+          ./mc cp registry-full.tar.bz2 minio/osism/metalbox/
       when:
         - _full | bool
         - _publish | bool
