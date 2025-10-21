@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration variables
-REGISTRY_URL="${REGISTRY_URL:-https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/metalbox/registry.tar.bz2}"
+REGISTRY_URL="${REGISTRY_URL:-https://nbg1.your-objectstorage.com/osism/metalbox/registry.tar.bz2}"
 REGISTRY_FILE="${REGISTRY_FILE:-registry.tar.bz2}"
 DOWNLOAD_PATH="${DOWNLOAD_PATH:-/opt}"
 CONTAINER_NAME="${CONTAINER_NAME:-registry}"

@@ -36,7 +36,7 @@ if [[ "$1" == "-h" || "$1" == "--help" ]]; then
 fi
 
 # Configuration variables
-BASE_URL="${BASE_URL:-https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images}"
+BASE_URL="${BASE_URL:-https://nbg1.your-objectstorage.com/osism/openstack-ironic-images}"
 TARGET_PATH="${TARGET_PATH:-/opt/httpd/data/root}"
 SOURCE_PATH="${SOURCE_PATH:-/home/dragon}"
 SKIP_DOWNLOAD="${SKIP_DOWNLOAD:-false}"

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration variables
-REPOSITORY_URL="${REPOSITORY_URL:-https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/metalbox/ubuntu-noble.tar.bz2}"
+REPOSITORY_URL="${REPOSITORY_URL:-https://nbg1.your-objectstorage.com/osism/metalbox/ubuntu-noble.tar.bz2}"
 REPOSITORY_FILE="${REPOSITORY_FILE:-ubuntu-noble.tar.bz2}"
 DOWNLOAD_PATH="${DOWNLOAD_PATH:-/opt}"
 CONTAINER_REGISTRY="${CONTAINER_REGISTRY:-127.0.0.1:5001}"
