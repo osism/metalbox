@@ -2,7 +2,7 @@
 
 ## Preparation
 
-1. Download the Metalbox image [osism-metalbox-image.zip](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-metalbox-image.zip).
+1. Download the Metalbox image [osism-metalbox-image.zip](https://nbg1.your-objectstorage.com/osism/openstack-ironic-images/osism-metalbox-image.zip).
    Unzip the `osism-metalbox-image.zip` file. The unzipped file is named
    `osism-metalbox-image.raw`.
 2. Download the latest small [Grml](https://grml.org/download/) live ISO file.
@@ -12,11 +12,11 @@
    When using a NetBox configuration repository provided by us, the file `netbox-export.img`
    can be downloaded from GitHub after a trigger of the `Run export` action.
 5. Download the Ironic images:
-   * [osism-ipa.initramfs](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-ipa.initramfs)
-   * [osism-ipa.kernel](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-ipa.kernel)
-   * [osism-node.qcow2](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-node.qcow2)
-   * [osism-node.qcow2.CHECKSUM](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-node.qcow2.CHECKSUM)
-   * [osism-esp.raw](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-esp.raw)
+   * [osism-ipa.initramfs](https://nbg1.your-objectstorage.com/osism/openstack-ironic-images/osism-ipa.initramfs)
+   * [osism-ipa.kernel](https://nbg1.your-objectstorage.com/osism/openstack-ironic-images/osism-ipa.kernel)
+   * [osism-node.qcow2](https://nbg1.your-objectstorage.com/osism/openstack-ironic-images/osism-node.qcow2)
+   * [osism-node.qcow2.CHECKSUM](https://nbg1.your-objectstorage.com/osism/openstack-ironic-images/osism-node.qcow2.CHECKSUM)
+   * [osism-esp.raw](https://nbg1.your-objectstorage.com/osism/openstack-ironic-images/osism-esp.raw)
 
 ## Installation
 
@@ -50,13 +50,13 @@
 #### Using the Metalbox as an Ubuntu repository server
 
 1. Download the Ubuntu repository archive
-   [ubuntu-noble.tar.bz2](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/metalbox/ubuntu-noble.tar.bz2)
+   [ubuntu-noble.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/ubuntu-noble.tar.bz2)
 2. Copy `ubuntu-noble.tar.bz2` to `/home/dragon` on the Metalbox node
 3. Run `update-repository.sh` to import the Ubuntu repository files
 
 #### Using Metalbox as a full container registry
 
-1. Download [registry-full.tar.bz2](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/metalbox/registry-full.tar.bz2)
+1. Download [registry-full.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-full.tar.bz2)
 2. Rename `registry-full.tar.bz2` to `registry.tar.bz2`
 3. Copy `registry.tar.bz2` to `/home/dragon` on the Metalbox node
 4. Run `SKIP_DOWNLOAD=true update-registry.sh` to update the container registry
@@ -79,11 +79,11 @@
 #### Without external connectivity
 
 1. Download the Ironic images:
-   * [osism-ipa.initramfs](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-ipa.initramfs)
-   * [osism-ipa.kernel](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-ipa.kernel)
-   * [osism-node.qcow2](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-node.qcow2)
-   * [osism-node.qcow2.CHECKSUM](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-node.qcow2.CHECKSUM)
-   * [osism-esp.raw](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/openstack-ironic-images/osism-esp.raw)
+   * [osism-ipa.initramfs](https://nbg1.your-objectstorage.com/osism/openstack-ironic-images/osism-ipa.initramfs)
+   * [osism-ipa.kernel](https://nbg1.your-objectstorage.com/osism/openstack-ironic-images/osism-ipa.kernel)
+   * [osism-node.qcow2](https://nbg1.your-objectstorage.com/osism/openstack-ironic-images/osism-node.qcow2)
+   * [osism-node.qcow2.CHECKSUM](https://nbg1.your-objectstorage.com/osism/openstack-ironic-images/osism-node.qcow2.CHECKSUM)
+   * [osism-esp.raw](https://nbg1.your-objectstorage.com/osism/openstack-ironic-images/osism-esp.raw)
 2. Copy the downloaded files to `/home/dragon` on the Metalbox node
 3. Run `SKIP_DOWNLOAD=true update-ironic-images.sh` to update the Ironic images
 
@@ -95,7 +95,7 @@
 
 #### Without external connectivity
 
-1. Download [registry.tar.bz2](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/metalbox/registry.tar.bz2)
+1. Download [registry.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry.tar.bz2)
 2. Copy `registry.tar.bz2` to `/home/dragon` on the Metalbox node
 3. Run `SKIP_DOWNLOAD=true update-registry.sh` to update the container registry
 
@@ -107,7 +107,7 @@
 
 #### Without external connectivity
 
-1. Download [ubuntu-noble.tar.bz2](https://swift.services.a.regiocloud.tech/swift/v1/AUTH_b182637428444b9aa302bb8d5a5a418c/metalbox/ubuntu-noble.tar.bz2)
+1. Download [ubuntu-noble.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/ubuntu-noble.tar.bz2)
 2. Copy `ubuntu-noble.tar.bz2` to `/home/dragon` on the Metalbox node
 3. Run `SKIP_DOWNLOAD=true update-repository.sh` to update the Ubuntu repository files
 
