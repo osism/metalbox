@@ -34,7 +34,7 @@ httpd_ironic_enable: true
 # repository
 
 httpd_data_enable: true
-httpd_data_image: registry.osism.tech/osism/packages/ubuntu-noble:latest
+httpd_data_image: localhost:5001/osism/packages/ubuntu-noble:latest
 
 ##########################################################
 # netbox

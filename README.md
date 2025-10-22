@@ -18,6 +18,15 @@
    * [osism-node.qcow2.CHECKSUM](https://nbg1.your-objectstorage.com/osism/openstack-ironic-images/osism-node.qcow2.CHECKSUM)
    * [osism-esp.raw](https://nbg1.your-objectstorage.com/osism/openstack-ironic-images/osism-esp.raw)
 
+### Optional steps
+
+1. If the Metalbox is to be used as an Ubuntu repository server for nodes inside the Cloudpod
+   download
+   [ubuntu-noble.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/ubuntu-noble.tar.bz2)
+2. If the Metalbox is to be used as a container registry for nodes inside the Cloudpod
+   download
+   [registry-full.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-full.tar.bz2)
+
 ## Installation
 
 1. Use the `osism-metalbox-image.raw` file as virtual media (vHDD).
@@ -37,13 +46,18 @@
 11. Run `osism apply network` to sync the network configuration.
 12. Run `osism apply facts` to sync the facts.
 13. Run `osism apply chrony` to sync the NTP configuration.
-14. Use the file `sonic-export.img` as virtual media (vHDD).
-15. Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards remove the virtual
+14. If the Metalbox is to be used as an Ubuntu repository server for nodes inside the
+    Cloudpod do all steps in "Using the Metalbox as an Ubuntu repository server" <ins>OR</ins>
+    disable the use of the Metalbox as repository server by running `disable-repository.sh`.
+15. Use the file `sonic-export.img` as virtual media (vHDD).
+16. Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards remove the virtual
     media (vHDD).
-16. Run `deploy-infrastructure.sh` to deploy the infrastructure services.
-17. Run `deploy-openstack.sh` to Deploy the OpenStack services.
-18. Upload the Ironic image files to `/opt/httpd/data/root`.
-19. Run `osism sync ironic` to sync the baremetal nodes.
+17. Run `deploy-infrastructure.sh` to deploy the infrastructure services.
+18. Run `deploy-openstack.sh` to Deploy the OpenStack services.
+19. Upload the Ironic image files to `/opt/httpd/data/root`.
+20. Run `osism sync ironic` to sync the baremetal nodes.
+21. Optional: If the Metalbox is to be used as a container registry for nodes inside
+    the Cloudpod do all steps in "Using Metalbox as a full container registry".
 
 ### Optional steps
 
@@ -52,7 +66,7 @@
 1. Download the Ubuntu repository archive
    [ubuntu-noble.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/ubuntu-noble.tar.bz2)
 2. Copy `ubuntu-noble.tar.bz2` to `/home/dragon` on the Metalbox node
-3. Run `update-repository.sh` to import the Ubuntu repository files
+3. Run `SKIP_DOWNLOAD update-repository.sh` to import the Ubuntu repository files
 
 #### Using Metalbox as a full container registry
 
