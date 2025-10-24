@@ -7,7 +7,9 @@
    `osism-metalbox-image.raw`.
 2. Download the latest small [Grml](https://grml.org/download/) live ISO file.
    When creating this document, the file name was `grml-small-2025.05-amd64.iso`.
-3. Download the SONiC export image `sonic-export.img` from the well known URL.
+3. Download the SONiC export image `sonic-export.img` from the well known URL. You can also
+   create this file locally by running `sonic-export.sh` inside a directory containing
+   your SONiC images.
 4. Export the NetBox configuration repository with `netbox-manager export-archive -i`.
    When using a NetBox configuration repository provided by us, the file `netbox-export.img`
    can be downloaded from GitHub after a trigger of the `Run export` action.
@@ -37,7 +39,8 @@
 4. Use the `netbox-export.img` file as virtual media (vHDD) and run `netbox-import.sh`.
    Afterwards remove the virtual media (vHDD).
 5. Run `deploy-netbox.sh` to deploy the NetBox service.
-6. Run `netbox-manage.sh` to initialise the NetBox service.
+6. Run `netbox-manage.sh` to initialise the NetBox service. Note that this can take a
+   couple of minutes to complete depending on the size of your installation.
 7. Set the managed site by running `netbox-site.sh SITE`
    (replace `SITE` with the slug name of the site managed by this Metalbox).
 8. Run `deploy-manager.sh` to deploy the OSISM manager service.
@@ -49,9 +52,10 @@
 14. If the Metalbox is to be used as an Ubuntu repository server for nodes inside the
     Cloudpod do all steps in "Using the Metalbox as an Ubuntu repository server" <ins>OR</ins>
     disable the use of the Metalbox as repository server by running `disable-repository.sh`.
-15. Use the file `sonic-export.img` as virtual media (vHDD).
+15. Use the file `sonic-export.img` as virtual media (vHDD) or mount it locally with
+    `sudo mount -o loop /path/to/sonic-export.img /mnt`.
 16. Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards remove the virtual
-    media (vHDD).
+    media (vHDD)/unmount the image again.
 17. Run `deploy-infrastructure.sh` to deploy the infrastructure services.
 18. Run `deploy-openstack.sh` to Deploy the OpenStack services.
 19. Upload the Ironic image files to `/opt/httpd/data/root`.
@@ -64,16 +68,18 @@
 #### Using the Metalbox as an Ubuntu repository server
 
 1. Download the Ubuntu repository archive
-   [ubuntu-noble.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/ubuntu-noble.tar.bz2)
-2. Copy `ubuntu-noble.tar.bz2` to `/home/dragon` on the Metalbox node
-3. Run `SKIP_DOWNLOAD update-repository.sh` to import the Ubuntu repository files
+   [ubuntu-noble.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/ubuntu-noble.tar.bz2).
+2. Copy `ubuntu-noble.tar.bz2` to `/home/dragon` on the Metalbox node.
+3. Run `SKIP_DOWNLOAD=true update-repository.sh` to import the Ubuntu repository files. Note that this
+   can take a couple of minutes to finish.
 
 #### Using Metalbox as a full container registry
 
-1. Download [registry-full.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-full.tar.bz2)
-2. Rename `registry-full.tar.bz2` to `registry.tar.bz2`
-3. Copy `registry.tar.bz2` to `/home/dragon` on the Metalbox node
-4. Run `SKIP_DOWNLOAD=true update-registry.sh` to update the container registry
+1. Download [registry-full.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-full.tar.bz2).
+2. Rename `registry-full.tar.bz2` to `registry.tar.bz2`.
+3. Copy `registry.tar.bz2` to `/home/dragon` on the Metalbox node.
+4. Run `SKIP_DOWNLOAD=true update-registry.sh` to update the container registry. Note that this can
+   take a couple of minutes to finish.
 
 ## Data updates
 
