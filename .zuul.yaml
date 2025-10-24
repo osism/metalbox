@@ -138,12 +138,14 @@
         - metalbox-mirror-debian-packages
         - ansible-lint
         - yamllint
+    periodic-midnight:
+      jobs:
+        - metalbox-mirror-debian-packages-publish
     periodic-daily:
       jobs:
         - ansible-lint
         - metalbox-mirror-container-images-publish
         - metalbox-mirror-container-images-full-publish
-        - metalbox-mirror-debian-packages-publish
         - yamllint
     post:
       jobs:
