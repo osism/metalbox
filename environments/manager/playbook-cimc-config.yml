@@ -303,16 +303,16 @@
     - name: Get System 1 MSTOR-RAID
       delegate_to: localhost
       vars:
-        mstor_raid: "{{ storage.json.Members | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | select('search', 'MSTOR-RAID') }}"
-      when: mstor_raid | length > 0
+        mstor_raid_endpoints: "{{ storage.json.Members | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | select('search', 'MSTOR-RAID') }}"
+      when: mstor_raid_endpoints | length > 0
       register: mstor_raid
       ansible.builtin.uri:
-        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ mstor_raid | first }}"
+        url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ mstor_raid_endpoints | first }}"
         <<: *uri_opts
 
     - name: Get System 1 MSTOR-RAID Volumes
       delegate_to: localhost
-      when: mstor_raid | length > 0
+      when: '"json" in mstor_raid and "Volumes" in mstor_raid.json'
       register: mstor_raid_volumes
       ansible.builtin.uri:
         url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ mstor_raid.json.Volumes | dict2items | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') | first }}"
@@ -430,7 +430,7 @@
                 <<: *uri_opts
 
             - name: Create System 1 MSTOR-RAID Root Volume
-              when: mstor_raid_volumes.json.Members | length == 0
+              when: '"json" in mstor_raid_volumes and "Members" in mstor_raid_volumes.json and mstor_raid_volumes.json.Members | length == 0'
               block:  # noqa osism-fqcn
                 - name: Get Drive properties
                   delegate_to: localhost
@@ -482,7 +482,7 @@
 
                 - name: Get System 1 MSTOR-RAID Volumes
                   delegate_to: localhost
-                  when: mstor_raid | length > 0
+                  when: '"json" in mstor_raid and "Volumes" in mstor_raid.json'
                   register: mstor_raid_volumes
                   until: mstor_raid_volumes.json.Members | length > 0
                   retries: 60
