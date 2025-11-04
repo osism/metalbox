@@ -15,6 +15,18 @@ wait_for_container_healthy() {
     done
 }
 
+# Validate that the site name has been configured
+if grep -q "Discworld" /opt/configuration/environments/manager/configuration.yml; then
+    echo "ERROR: Default site name 'Discworld' detected in configuration"
+    echo ""
+    echo "Please set your actual site name before deploying."
+    echo "Run the following command with your site name:"
+    echo ""
+    echo "  netbox-site.sh <your_site_name>"
+    echo ""
+    exit 1
+fi
+
 pushd /opt/configuration/environments/manager
 bash run.sh manager
 popd
