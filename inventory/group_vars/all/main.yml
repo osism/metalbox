@@ -2,4 +2,4 @@
 internal_address: 192.168.42.10
 internal_interface: metalbox
 network_interface: "{{ internal_interface }}"
-dnsmasq_interface: "{{ internal_interface }}"
+dnsmasq_interfaces: []
