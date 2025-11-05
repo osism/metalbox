@@ -94,6 +94,15 @@
 4. Run `unmount-images.sh` to unmount the `netbox-export.img` image.
 5. Run `netbox-manage.sh` to sync netbox with the state in `/opt/configuration/netbox`.
 
+It is also possible to update only the data from specific devices. To do this, the netbox-manager
+can be used directly in the NetBox directory. In the following example, only files with the
+prefix `300-node10` are processed.
+
+```
+cd /opt/configuration/netbox
+netbox-manager run --limit 300-node10
+```
+
 ### Update of the Ironic images
 
 #### Without external connectivity
