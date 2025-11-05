@@ -15,6 +15,8 @@ wait_for_container_healthy() {
     done
 }
 
+until stat /var/lib/cloud/instance/boot-finished 2>/dev/null; do echo Wait for cloud-init to finish; sleep 1; done
+
 pushd /opt/configuration/environments/manager
 bash run.sh netbox
 popd
