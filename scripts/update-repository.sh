@@ -4,9 +4,10 @@
 REPOSITORY_URL="${REPOSITORY_URL:-https://nbg1.your-objectstorage.com/osism/metalbox/ubuntu-noble.tar.bz2}"
 REPOSITORY_FILE="${REPOSITORY_FILE:-ubuntu-noble.tar.bz2}"
 DOWNLOAD_PATH="${DOWNLOAD_PATH:-/opt}"
-CONTAINER_REGISTRY="${CONTAINER_REGISTRY:-127.0.0.1:5001}"
-REPOSITORY_IMAGE="${REPOSITORY_IMAGE:-osism/ubuntu-noble}"
+CONTAINER_REGISTRY="${CONTAINER_REGISTRY:-localhost:5001}"
+REPOSITORY_IMAGE="${REPOSITORY_IMAGE:-osism/packages/ubuntu-noble}"
 SKIP_DOWNLOAD="${SKIP_DOWNLOAD:-false}"
+SKIP_PUSH="${SKIP_PUSH:-true}"
 
 set -e
 
@@ -62,8 +63,12 @@ TARGET_IMAGE="$CONTAINER_REGISTRY/$REPOSITORY_IMAGE:latest"
 echo "Tagging image as: $TARGET_IMAGE"
 docker tag "$LOADED_IMAGE" "$TARGET_IMAGE"
 
-echo "Pushing image to container registry..."
-docker push "$TARGET_IMAGE"
+if [ "$SKIP_PUSH" = "true" ]; then
+    echo "SKIP_PUSH is set to true, skipping push to registry..."
+else
+    echo "Pushing image to container registry..."
+    docker push "$TARGET_IMAGE"
+fi
 
 echo "Repository update completed successfully!"
 echo "Image available at: $TARGET_IMAGE"
