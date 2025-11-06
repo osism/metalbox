@@ -49,7 +49,7 @@
 8. Run `deploy-manager.sh` to deploy the OSISM manager service.
 9. Run `osism sync inventory` to sync the inventory.
 10. Run `osism apply hosts` to sync the `/etc/hosts` file.
-11. Run `osism apply network` to sync the network configuration.
+11. Run `osism apply network` and `osism apply frr` to sync the network configuration.
 12. Run `osism apply facts` to sync the facts.
 13. Run `osism apply chrony` to sync the NTP configuration.
 14. Use as Ubuntu repository server.
