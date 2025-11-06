@@ -225,7 +225,7 @@ fi
 echo -e "${YELLOW}Found ${#FOUND_FILES[@]} file(s) to copy${NC}"
 
 # Create destination directory if it doesn't exist
-sudo mkdir -p "$SONIC_DEST_DIR"
+sudo mkdir -p -m 0755 "$SONIC_DEST_DIR"
 sudo chown -R dragon: "$SONIC_DEST_DIR"
 
 # Copy all found files to destination
