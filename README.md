@@ -36,8 +36,11 @@
 3. Write the Metalbox image with `dd if=/dev/sdc of=/dev/sda bs=4M status=progress` to
    the first disk. Afterwards power off the node, remove all virtual media devices and
    power on the node again.
-4. Use the `netbox-export.img` file as virtual media (vHDD) and run `netbox-import.sh`.
-   Afterwards remove the virtual media (vHDD).
+4. Import of the NetBox files.
+   * Use the `netbox-export.img` file as virtual media (vHDD) and run `netbox-import.sh`
+     to import the NetBox files. Afterwards remove the virtual media (vHDD).
+   * <ins>OR</ins> Copy the `netbox-export.img` file to `/home/dragon` and run `mount-images.sh`.
+     Run `netbox-import.sh` to import the NetBox files. Afterwards run `unmount-images.sh`.
 5. Run `deploy-netbox.sh` to deploy the NetBox service.
 6. Run `netbox-manage.sh` to initialise the NetBox service. Note that this can take a
    couple of minutes to complete depending on the size of your installation.
@@ -49,18 +52,21 @@
 11. Run `osism apply network` to sync the network configuration.
 12. Run `osism apply facts` to sync the facts.
 13. Run `osism apply chrony` to sync the NTP configuration.
-14. If the Metalbox is to be used as an Ubuntu repository server for nodes inside the
-    Cloudpod do all steps in "Using the Metalbox as an Ubuntu repository server" <ins>OR</ins>
-    disable the use of the Metalbox as repository server by running `disable-repository.sh`.
-15. Use the file `sonic-export.img` as virtual media (vHDD) or mount it locally with
-    `sudo mount -o loop /path/to/sonic-export.img /mnt`.
-16. Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards remove the virtual
-    media (vHDD)/unmount the image again.
-17. Run `deploy-infrastructure.sh` to deploy the infrastructure services.
-18. Run `deploy-openstack.sh` to Deploy the OpenStack services.
-19. Upload the Ironic image files to `/opt/httpd/data/root`.
-20. Run `osism sync ironic` to sync the baremetal nodes.
-21. Optional: If the Metalbox is to be used as a container registry for nodes inside
+14. Use as Ubuntu repository server.
+    * If the Metalbox is to be used as an Ubuntu repository server for nodes inside the
+      Cloudpod do all steps in "Using the Metalbox as an Ubuntu repository server".
+    *  <ins>OR</ins> Disable the use of the Metalbox as repository server by running
+      `disable-repository.sh`.
+15. Import of the SONiC files.
+    * Use the file `sonic-export.img` as virtual media (vHDD) and run `deploy-sonic.sh` to deploy
+      the SONiC ZTP services. Afterwards remove the virtual media (vHDD).
+    * <ins>OR</ins> Copy the `sonic-export.img` file to `/home/dragon` and run `mount-images.sh`.
+      Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards run `unmount-images.sh`.
+16. Run `deploy-infrastructure.sh` to deploy the infrastructure services.
+17. Run `deploy-openstack.sh` to Deploy the OpenStack services.
+18. Upload the Ironic image files to `/opt/httpd/data/root`.
+19. Run `osism sync ironic` to sync the baremetal nodes.
+20. Optional: If the Metalbox is to be used as a container registry for nodes inside
     the Cloudpod do all steps in "Using Metalbox as a full container registry".
 
 ### Optional steps
@@ -153,7 +159,7 @@ netbox-manager run --limit 300-node10
 
 ### Update of the NetBox service
 
-1. The container registry must be updated first in order to receive a Netbox update
+1. The container registry must be updated first in order to receive a NetBox update
 2. Run `update-netbox.sh` to update the NetBox service
 
 ### Update of the infrastructure services
