@@ -3,10 +3,13 @@ Fetch device configuration from Netbox and write to Ansible group_vars.
 
 This script queries a Netbox device by name and extracts specific configuration
 values from its local_context_data, writing them to an Ansible group_vars YAML file.
+Additionally, it reads the device's site information and sets the managed Netbox site
+by calling the netbox-site.sh script.
 """
 
 import os
 import sys
+import subprocess
 import yaml
 from pathlib import Path
 from pynetbox import api
@@ -60,16 +63,55 @@ def get_netbox_client():
         sys.exit(1)
 
 
+def set_netbox_site(site_slug):
+    """
+    Set the managed Netbox site by calling the netbox-site.sh script.
+
+    Args:
+        site_slug: The site slug to set as the managed site
+
+    Raises:
+        SystemExit: If the subprocess call fails
+    """
+    script_path = "/opt/configuration/scripts/netbox-site.sh"
+
+    try:
+        print(f"Setting managed Netbox site to '{site_slug}'...")
+        result = subprocess.run(
+            [script_path, site_slug], check=True, capture_output=True, text=True
+        )
+
+        # Log stdout if present
+        if result.stdout:
+            print(f"netbox-site.sh output: {result.stdout.strip()}")
+
+        print(f"Successfully set managed site to '{site_slug}'")
+
+    except FileNotFoundError:
+        print(f"Error: Script not found at {script_path}", file=sys.stderr)
+        sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        print(f"Error: Failed to set Netbox site '{site_slug}'", file=sys.stderr)
+        print(f"Script exited with code {e.returncode}", file=sys.stderr)
+        if e.stderr:
+            print(f"Error output: {e.stderr}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: Unexpected error calling netbox-site.sh", file=sys.stderr)
+        print(f"Details: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 def fetch_device_config(nb, device_name):
     """
-    Fetch device configuration from Netbox.
+    Fetch device configuration and site information from Netbox.
 
     Args:
         nb: Netbox API client
         device_name: Name of the device to query
 
     Returns:
-        dict: Device local_context_data containing configuration values
+        tuple: (local_context_data dict, site object or None)
     """
     try:
         device = nb.dcim.devices.get(name=device_name)
@@ -78,14 +120,20 @@ def fetch_device_config(nb, device_name):
             print(f"Error: Device '{device_name}' not found in Netbox", file=sys.stderr)
             sys.exit(1)
 
-        if not hasattr(device, "local_context_data") or not device.local_context_data:
+        # Extract site information if available
+        site = device.site if hasattr(device, "site") and device.site else None
+
+        # Extract local context data
+        local_context_data = {}
+        if hasattr(device, "local_context_data") and device.local_context_data:
+            local_context_data = device.local_context_data
+        else:
             print(
                 f"Warning: Device '{device_name}' has no local_context_data",
                 file=sys.stderr,
             )
-            return {}
 
-        return device.local_context_data
+        return local_context_data, site
 
     except Exception as e:
         print(
@@ -167,9 +215,27 @@ def main():
     print(f"Connecting to Netbox...")
     nb = get_netbox_client()
 
-    # Fetch device configuration
+    # Fetch device configuration and site information
     print(f"Fetching configuration for device '{device_name}'...")
-    local_context_data = fetch_device_config(nb, device_name)
+    local_context_data, site = fetch_device_config(nb, device_name)
+
+    # Set the managed Netbox site if available
+    if site:
+        # Extract site slug from the site object
+        site_slug = site.slug if hasattr(site, "slug") else None
+
+        if site_slug:
+            set_netbox_site(site_slug)
+        else:
+            print(
+                f"Warning: Device '{device_name}' has a site but no slug available",
+                file=sys.stderr,
+            )
+    else:
+        print(
+            f"Warning: Device '{device_name}' has no site configured in Netbox",
+            file=sys.stderr,
+        )
 
     # Extract required values
     config = extract_config_values(local_context_data)
