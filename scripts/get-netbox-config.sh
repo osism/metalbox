@@ -11,5 +11,5 @@ fi
 NODE="$1"
 
 pushd /opt/configuration/environments/manager
-./venv/bin/python3 get.py $NODE
+./venv/bin/python3 get-netbox-config.py $NODE
 popd
