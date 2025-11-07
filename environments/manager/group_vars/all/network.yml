@@ -1,9 +1,6 @@
 ---
 network_ethernets: {}
 network_dummy_devices:
-  loopback0:
-    link-local:
-      - ipv6
   metalbox:
     addresses:
       - 192.168.42.10/24
