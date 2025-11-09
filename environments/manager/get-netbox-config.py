@@ -240,6 +240,10 @@ def main():
     # Extract required values
     config = extract_config_values(local_context_data)
 
+    # Add operator_ps1_custom with site slug if available
+    if site and site_slug:
+        config["operator_ps1_custom"] = f"[{site_slug}]"
+
     if not config:
         print(
             f"Warning: No configuration values (netbox_secondaries, chrony_servers) found in device's local_context_data",
