@@ -20,7 +20,7 @@
    * [osism-node.qcow2.CHECKSUM](https://nbg1.your-objectstorage.com/osism/openstack-ironic-images/osism-node.qcow2.CHECKSUM)
    * [osism-esp.raw](https://nbg1.your-objectstorage.com/osism/openstack-ironic-images/osism-esp.raw)
 
-### Optional steps
+### Additional steps for air gap environments
 
 1. If the Metalbox is to be used as an Ubuntu repository server for nodes inside the Cloudpod
    download
@@ -66,10 +66,10 @@
 17. Run `deploy-openstack.sh` to Deploy the OpenStack services.
 18. Upload the Ironic image files to `/opt/httpd/data/root`.
 19. Run `osism sync ironic` to sync the baremetal nodes.
-20. Optional: If the Metalbox is to be used as a container registry for nodes inside
-    the Cloudpod do all steps in "Using Metalbox as a full container registry".
+20. Additional steps for air gap environments: If the Metalbox is to be used as a container
+    registry for nodes inside the Cloudpod do all steps in "Using Metalbox as a full container registry".
 
-### Optional steps
+### Additional steps for air gap environments
 
 #### Using the Metalbox as an Ubuntu repository server
 
