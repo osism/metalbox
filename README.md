@@ -49,24 +49,25 @@
 8. Run `deploy-manager.sh` to deploy the OSISM manager service.
 9. Run `osism sync inventory` to sync the inventory.
 10. Run `osism apply hosts` to sync the `/etc/hosts` file.
-11. Run `osism apply network` and `osism apply frr` to sync the network configuration.
-12. Run `osism apply facts` to sync the facts.
-13. Run `osism apply chrony` to sync the NTP configuration.
-14. Use as Ubuntu repository server.
+11. Run `osism apply network` to sync the network configuration.
+12. Run `osism apply frr` to sync the FRR configuration.
+13. Run `osism apply facts` to sync the facts.
+14. Run `osism apply chrony` to sync the NTP configuration.
+15. Use as Ubuntu repository server.
     * If the Metalbox is to be used as an Ubuntu repository server for nodes inside the
       Cloudpod do all steps in "Using the Metalbox as an Ubuntu repository server".
     *  <ins>OR</ins> Disable the use of the Metalbox as repository server by running
       `disable-repository.sh`.
-15. Import of the SONiC files.
+16. Import of the SONiC files.
     * Use the file `sonic-export.img` as virtual media (vHDD) and run `deploy-sonic.sh` to deploy
       the SONiC ZTP services. Afterwards remove the virtual media (vHDD).
     * <ins>OR</ins> Copy the `sonic-export.img` file to `/home/dragon` and run `mount-images.sh`.
       Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards run `unmount-images.sh`.
-16. Run `deploy-infrastructure.sh` to deploy the infrastructure services.
-17. Run `deploy-openstack.sh` to Deploy the OpenStack services.
-18. Upload the Ironic image files to `/opt/httpd/data/root`.
-19. Run `osism sync ironic` to sync the baremetal nodes.
-20. Additional steps for air gap environments: If the Metalbox is to be used as a container
+17. Run `deploy-infrastructure.sh` to deploy the infrastructure services.
+18. Run `deploy-openstack.sh` to Deploy the OpenStack services.
+19. Upload the Ironic image files to `/opt/httpd/data/root`.
+20. Run `osism sync ironic` to sync the baremetal nodes.
+21. Additional steps for air gap environments: If the Metalbox is to be used as a container
     registry for nodes inside the Cloudpod do all steps in "Using Metalbox as a full container registry".
 
 ### Additional steps for air gap environments
