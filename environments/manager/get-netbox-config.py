@@ -40,6 +40,36 @@ def literal_str_representer(dumper, data):
 yaml.add_representer(str, literal_str_representer)
 
 
+class VaultString(str):
+    """
+    A string subclass to mark Ansible Vault encrypted values.
+    This allows the YAML dumper to recognize and properly tag vault strings.
+    """
+
+    pass
+
+
+def vault_representer(dumper, data):
+    """
+    Custom YAML representer for Ansible Vault encrypted strings.
+
+    Outputs the vault string with the !vault tag and literal scalar style (|).
+
+    Args:
+        dumper: YAML dumper instance
+        data: VaultString data to represent
+
+    Returns:
+        YAML scalar node with !vault tag
+    """
+    # Use literal scalar style (|) for vault strings
+    return dumper.represent_scalar("!vault", data, style="|")
+
+
+# Register the custom representers
+yaml.add_representer(VaultString, vault_representer)
+
+
 def get_netbox_client():
     """
     Create and return a Netbox API client.
@@ -111,7 +141,7 @@ def fetch_device_config(nb, device_name):
         device_name: Name of the device to query
 
     Returns:
-        tuple: (local_context_data dict, site object or None)
+        tuple: (local_context_data dict, site object or None, custom_fields dict)
     """
     try:
         device = nb.dcim.devices.get(name=device_name)
@@ -133,7 +163,22 @@ def fetch_device_config(nb, device_name):
                 file=sys.stderr,
             )
 
-        return local_context_data, site
+        # Extract custom fields
+        custom_fields = {}
+        if hasattr(device, "custom_fields") and device.custom_fields:
+            # Convert custom_fields to dictionary if it's not already
+            if isinstance(device.custom_fields, dict):
+                custom_fields = device.custom_fields
+            else:
+                # Try to convert to dict
+                custom_fields = dict(device.custom_fields)
+        else:
+            print(
+                f"Warning: Device '{device_name}' has no custom_fields",
+                file=sys.stderr,
+            )
+
+        return local_context_data, site, custom_fields
 
     except Exception as e:
         print(
@@ -143,12 +188,13 @@ def fetch_device_config(nb, device_name):
         sys.exit(1)
 
 
-def extract_config_values(local_context_data):
+def extract_config_values(local_context_data, custom_fields):
     """
-    Extract required configuration values from local_context_data.
+    Extract required configuration values from local_context_data and custom_fields.
 
     Args:
         local_context_data: Device's local_context_data dictionary
+        custom_fields: Device's custom_fields dictionary
 
     Returns:
         dict: Extracted configuration values
@@ -162,6 +208,30 @@ def extract_config_values(local_context_data):
     # Extract chrony_servers if present
     if "chrony_servers" in local_context_data:
         config["chrony_servers"] = local_context_data["chrony_servers"]
+
+    # Extract individual secrets from custom field if present
+    # Access custom_fields as dictionary and extract each secret separately
+    if custom_fields and "secrets" in custom_fields and custom_fields["secrets"]:
+        secrets = custom_fields["secrets"]
+        # If secrets is a dictionary, extract each secret as a separate parameter
+        if isinstance(secrets, dict):
+            for secret_key, secret_value in secrets.items():
+                # Check if the value is an Ansible Vault encrypted string
+                if isinstance(secret_value, str) and secret_value.strip().startswith(
+                    "$ANSIBLE_VAULT"
+                ):
+                    # Mark as VaultString so YAML dumper adds !vault tag
+                    config[secret_key] = VaultString(secret_value)
+                else:
+                    config[secret_key] = secret_value
+        else:
+            # If secrets is not a dictionary, store it as a single value
+            if isinstance(secrets, str) and secrets.strip().startswith(
+                "$ANSIBLE_VAULT"
+            ):
+                config["netbox_secrets"] = VaultString(secrets)
+            else:
+                config["netbox_secrets"] = secrets
 
     return config
 
@@ -217,7 +287,7 @@ def main():
 
     # Fetch device configuration and site information
     print(f"Fetching configuration for device '{device_name}'...")
-    local_context_data, site = fetch_device_config(nb, device_name)
+    local_context_data, site, custom_fields = fetch_device_config(nb, device_name)
 
     # Set the managed Netbox site if available
     if site:
@@ -238,7 +308,7 @@ def main():
         )
 
     # Extract required values
-    config = extract_config_values(local_context_data)
+    config = extract_config_values(local_context_data, custom_fields)
 
     # Add operator_ps1_custom with site slug if available
     if site and site_slug:
