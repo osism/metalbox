@@ -6,3 +6,4 @@ id_rsa.operator
 roles
 secrets
 secure.yml
+venv
