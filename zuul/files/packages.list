@@ -469,6 +469,7 @@ linux-firmware
 linux-generic-hwe-24.04
 linux-headers-generic-hwe-24.04
 linux-image-generic
+linux-image-generic-hwe-24.04
 lldpd
 locales
 login
