@@ -3,20 +3,25 @@ images:
   - hashicorp/vault:1.19.5
   - library/httpd:alpine
   - library/mariadb:11.7.2
+  - library/mariadb:11.8.4
   - library/postgres:16.9-alpine
+  - library/postgres:16.11-alpine
   - library/redis:7.4.4-alpine
+  - library/redis:7.4.7-alpine
   - library/traefik:v3.4.1
   - pgautoupgrade/pgautoupgrade:16-alpine
   - ubuntu/squid:6.1-23.10_beta
 
 images_manager:
   - ara-server:1.7.2
+  - ara-server:1.7.3
   - dnsdist:1.9.8
   - dnsmasq-osism:2.90
   - gnmic:0.41.0
   - inventory-reconciler:latest
   - kolla-ansible:2024.2
   - netbox:v4.3.3
+  - netbox:v4.3.5
   - openstackclient:2024.2
   - osism-ansible:latest
   - osism-frontend:latest
@@ -63,6 +68,8 @@ images_kolla:
   - horizon:2024.2
   - iscsid:2024.2
   - keepalived:2024.2
+  - letsencrypt-lego:2024.2
+  - letsencrypt-webserver:2024.2
   - multipathd:2024.2
   - neutron-metadata-agent:2024.2
   - neutron-server:2024.2
