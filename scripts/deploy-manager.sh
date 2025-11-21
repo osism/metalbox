@@ -28,6 +28,7 @@ if grep -q "Discworld" /opt/configuration/environments/manager/configuration.yml
 fi
 
 pushd /opt/configuration/environments/manager
+bash run.sh operator
 bash run.sh manager
 popd
 
