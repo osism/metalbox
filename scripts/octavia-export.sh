@@ -10,7 +10,7 @@ NC='\033[0m' # No Color
 
 # Default values or use environment variables
 OCTAVIA_BASE_URL="${OCTAVIA_BASE_URL:-https://nbg1.your-objectstorage.com/osism/openstack-octavia-amphora-image}"
-OCTAVIA_EXPORT_SIZE="${OCTAVIA_EXPORT_SIZE:-2G}"
+OCTAVIA_EXPORT_SIZE="${OCTAVIA_EXPORT_SIZE:-1G}"
 
 # Check if version parameter is provided
 if [[ -z "$1" ]]; then
