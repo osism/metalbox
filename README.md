@@ -28,6 +28,9 @@
 2. If the Metalbox is to be used as a container registry for nodes inside the Cloudpod
    download
    [registry-full.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-full.tar.bz2)
+3. If the Metalbox is to be used as a file server for nodes inside the Cloudpod
+   download
+   [octavia-export-2024.2.img](https://nbg1.your-objectstorage.com/osism/metalbox/octavia-export-2024.2.img)
 
 ## Installation
 
@@ -67,8 +70,11 @@
 18. Run `deploy-openstack.sh` to Deploy the OpenStack services.
 19. Upload the Ironic image files to `/opt/httpd/data/root`.
 20. Run `osism sync ironic` to sync the baremetal nodes.
-21. Additional steps for air gap environments: If the Metalbox is to be used as a container
-    registry for nodes inside the Cloudpod do all steps in "Using Metalbox as a full container registry".
+21. Additional steps for air gap environments:
+    * If the Metalbox is to be used as a container registry for nodes inside the Cloudpod do all
+      steps in "Using Metalbox as a full container registry".
+    * If the Metalbox is to be used as a file server for nodes inside the Cloudpod do all
+      steps in "Using Metalbox as a file server".
 
 ### Additional steps for air gap environments
 
@@ -87,6 +93,13 @@
 3. Copy `registry.tar.bz2` to `/home/dragon` on the Metalbox node.
 4. Run `SKIP_DOWNLOAD=true update-registry.sh` to update the container registry. Note that this can
    take a couple of minutes to finish.
+
+#### Using Metalbox as a file server
+
+1. Download the Octavia image export
+   [octavia-export-2024.2.img](https://nbg1.your-objectstorage.com/osism/metalbox/octavia-export-2024.2.img).
+2. Copy `octavia-export-2024.2.img` to `/home/dragon` on the Metalbox node.
+3. Run `octavia-import.sh` to import the Octavia image files.
 
 ## Data updates
 

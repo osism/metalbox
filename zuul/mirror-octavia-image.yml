@@ -30,13 +30,13 @@
           set -o pipefail
           set -x
 
-          sha256sum octavia-export-{{ openstack_version }}.img > octavia-export-{{ openstack_version }}.img.CHECKSUM
+          sha256sum octavia-export-{{ _openstack_version }}.img > octavia-export-{{ _openstack_version }}.img.CHECKSUM
 
           wget https://dl.min.io/client/mc/release/linux-amd64/mc
           chmod +x mc
           ./mc alias set minio {{ minio_url }} {{ secret.MINIO_ACCESS_KEY | trim }} {{ secret.MINIO_SECRET_KEY | trim }}
-          ./mc cp octavia-export-{{ openstack_version }}.img.CHECKSUM minio/osism/metalbox/
-          ./mc cp octavia-export-{{ openstack_version }}.img minio/osism/metalbox/
+          ./mc cp octavia-export-{{ _openstack_version }}.img.CHECKSUM minio/osism/metalbox/
+          ./mc cp octavia-export-{{ _openstack_version }}.img minio/osism/metalbox/
       when: _publish | default(false) | bool
       changed_when: true
       no_log: true
