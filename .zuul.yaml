@@ -59,6 +59,10 @@
     name: semaphore-metalbox-mirror-container-images-full-publish
     max: 1
 
+- semaphore:
+    name: semaphore-metalbox-mirror-octavia-image-publish
+    max: 1
+
 - job:
     name: metalbox-mirror-debian-packages
     nodeset: ubuntu-noble-large
@@ -89,6 +93,15 @@
     timeout: 3600
     vars:
       full: true
+
+- job:
+    name: metalbox-mirror-octavia-image
+    nodeset: ubuntu-noble-large
+    pre-run: zuul/pre-mirror-octavia-image.yml
+    run: zuul/mirror-octavia-image.yml
+    files:
+      - "^zuul/mirror-octavia-image.yml"
+      - "^zuul/pre-mirror-octavia-image.yml"
 
 - job:
     name: metalbox-mirror-debian-packages-publish
@@ -128,6 +141,18 @@
         secret: SECRET_METALBOX
         pass-to-parent: true
 
+- job:
+    name: metalbox-mirror-octavia-image-publish
+    parent: metalbox-mirror-octavia-image
+    semaphores:
+      - name: semaphore-metalbox-mirror-octavia-image-publish
+    vars:
+      publish: true
+    secrets:
+      - name: secret
+        secret: SECRET_METALBOX
+        pass-to-parent: true
+
 - project:
     merge-mode: squash-merge
     default-branch: main
@@ -136,6 +161,7 @@
         - metalbox-mirror-container-images
         - metalbox-mirror-container-images-full
         - metalbox-mirror-debian-packages
+        - metalbox-mirror-octavia-image
         - ansible-lint
         - yamllint
     periodic-midnight:
@@ -154,4 +180,6 @@
         - metalbox-mirror-container-images-full-publish:
             branches: main
         - metalbox-mirror-debian-packages-publish:
+            branches: main
+        - metalbox-mirror-octavia-image-publish:
             branches: main
