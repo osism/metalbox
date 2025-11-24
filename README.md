@@ -187,3 +187,14 @@ netbox-manager run --limit 300-node10
 
 1. The container registry must be updated first in order to receive OpenStack service updates
 2. Run `update-openstack.sh` to update the OpenStack services
+
+## Update from a single image on the container registry
+
+Replace `registry.osism.tech/osism/inventory-reconciler:latest` and `registry-delta-YYYYMMDD-HHMM.tar.gz`
+as needed.
+
+1. Run `scripts/singe-image-export.sh registry.osism.tech/osism/inventory-reconciler:latest` on a local
+   system to create a `registry-delta-YYYYMMDD-HHMM.tar.gz` file
+2. Copy `registry-delta-YYYYMMDD-HHMM.tar.gz` to `/home/dragon` on the Metalbox node
+3. Run `single-image-import.sh registry-delta-YYYYMMDD-HHMM.tar.gz` on the Metalbox node to import
+   the image
