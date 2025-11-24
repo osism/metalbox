@@ -193,7 +193,7 @@ if [[ ${#FOUND_FILES[@]} -eq 0 ]]; then
 
         if [[ -n "$mount_point" ]]; then
             echo -e "Checking mounted loopback device: $device at $mount_point"
-            search_on_device "$device" "$mount_point" "yes"
+            search_on_device "$device" "$mount_point" "yes" || true
         else
             # Not mounted, try to mount temporarily
             echo -e "Checking unmounted loopback device: $device"
@@ -206,7 +206,7 @@ if [[ ${#FOUND_FILES[@]} -eq 0 ]]; then
 
             # Try to mount it
             if sudo mount -t ext4 -o ro "$device" "$TEMP_MOUNT_DIR" 2>/dev/null; then
-                search_on_device "$device" "$TEMP_MOUNT_DIR" "no"
+                search_on_device "$device" "$TEMP_MOUNT_DIR" "no" || true
             else
                 echo -e "  Could not mount $device"
             fi
