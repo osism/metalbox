@@ -99,7 +99,9 @@
 1. Download the Octavia image export
    [octavia-export-2024.2.img](https://nbg1.your-objectstorage.com/osism/metalbox/octavia-export-2024.2.img).
 2. Copy `octavia-export-2024.2.img` to `/home/dragon` on the Metalbox node.
-3. Run `octavia-import.sh` to import the Octavia image files.
+3. Run `mount-images.sh` to mount the `octavia-export-2024.2.img` image.
+4. Run `octavia-import.sh` to import the Octavia image files.
+5. Run `unmount-images.sh` to unmount the `octavia-export-2024.2.img` image.
 
 ## Data updates
 
