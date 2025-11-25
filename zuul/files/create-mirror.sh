@@ -852,78 +852,81 @@ download_packages() {
 
     log "Resolving dependencies for ${#PACKAGES[@]} initial packages..."
 
-    # Process each repository for dependency resolution
+    # First, collect Packages.gz files from ALL repositories
+    local packages_files=()
     for repo_config in "${REPOSITORIES[@]}"; do
         IFS=':' read -r host path dist components arch <<< "$repo_config"
 
         local base_url="http://$host$path"
-        log "Processing repository: $base_url $dist"
+        log "Downloading package metadata from: $base_url $dist"
 
-        # Download all Packages.gz files for dependency resolution
-        local packages_files=()
+        # Download all Packages.gz files for this repository
         IFS=',' read -ra COMP_ARRAY <<< "$components"
         for component in "${COMP_ARRAY[@]}"; do
             local packages_url="$base_url/dists/$dist/$component/binary-$arch/Packages.gz"
-            local packages_file="$TEMP_DIR/Packages_${dist}_${component}_$$.gz"
+            local packages_file="$TEMP_DIR/Packages_${host//[^a-zA-Z0-9]/_}_${dist}_${component}_$$.gz"
 
             if download_file "$packages_url" "$packages_file" >/dev/null 2>&1; then
                 packages_files+=("$packages_file")
+                log "  + Loaded: $dist/$component"
+            else
+                log "  - Failed: $dist/$component"
             fi
         done
-
-        # Resolve dependencies iteratively
-        local iteration=0
-        local max_iterations=10
-
-        while [[ ${#packages_to_download[@]} -gt 0 && $iteration -lt $max_iterations ]]; do
-            iteration=$((iteration + 1))
-            log "  Dependency resolution iteration $iteration"
-
-            local new_dependencies=()
-
-            for package in "${packages_to_download[@]}"; do
-                # Skip if already processed
-                if [[ " ${processed_packages[@]} " =~ " ${package} " ]]; then
-                    continue
-                fi
-
-                processed_packages+=("$package")
-                log "    Resolving dependencies for: $package"
-
-                # Find dependencies in all package files
-                for packages_file in "${packages_files[@]}"; do
-                    local deps=$(resolve_dependencies_from_file "$package" "$packages_file")
-                    if [[ -n "$deps" ]]; then
-                        while IFS= read -r dep; do
-                            if [[ -n "$dep" && ! " ${processed_packages[@]} " =~ " ${dep} " ]]; then
-                                new_dependencies+=("$dep")
-                                log "      Found dependency: $dep"
-                            fi
-                        done <<< "$deps"
-                    fi
-                done
-            done
-
-            # Remove duplicates and update packages_to_download
-            packages_to_download=()
-            for dep in "${new_dependencies[@]}"; do
-                if [[ ! " ${processed_packages[@]} " =~ " ${dep} " ]]; then
-                    packages_to_download+=("$dep")
-                fi
-            done
-
-            # Remove duplicates
-            if [[ ${#packages_to_download[@]} -gt 0 ]]; then
-                IFS=$'\n' packages_to_download=($(printf '%s\n' "${packages_to_download[@]}" | sort -u))
-                log "    Found ${#packages_to_download[@]} new dependencies to resolve"
-            fi
-        done
-
-        # Clean up temporary packages files
-        rm -f "$TEMP_DIR"/Packages_*_$$.gz
-
-        break  # Only process the first repository for dependency resolution
     done
+
+    log "Loaded ${#packages_files[@]} package metadata files for dependency resolution"
+
+    # Resolve dependencies iteratively using ALL package files
+    local iteration=0
+    local max_iterations=10
+
+    while [[ ${#packages_to_download[@]} -gt 0 && $iteration -lt $max_iterations ]]; do
+        iteration=$((iteration + 1))
+        log "  Dependency resolution iteration $iteration"
+
+        local new_dependencies=()
+
+        for package in "${packages_to_download[@]}"; do
+            # Skip if already processed
+            if [[ " ${processed_packages[@]} " =~ " ${package} " ]]; then
+                continue
+            fi
+
+            processed_packages+=("$package")
+            log "    Resolving dependencies for: $package"
+
+            # Find dependencies in ALL package files from ALL repositories
+            for packages_file in "${packages_files[@]}"; do
+                local deps=$(resolve_dependencies_from_file "$package" "$packages_file")
+                if [[ -n "$deps" ]]; then
+                    while IFS= read -r dep; do
+                        if [[ -n "$dep" && ! " ${processed_packages[@]} " =~ " ${dep} " ]]; then
+                            new_dependencies+=("$dep")
+                            log "      Found dependency: $dep"
+                        fi
+                    done <<< "$deps"
+                fi
+            done
+        done
+
+        # Remove duplicates and update packages_to_download
+        packages_to_download=()
+        for dep in "${new_dependencies[@]}"; do
+            if [[ ! " ${processed_packages[@]} " =~ " ${dep} " ]]; then
+                packages_to_download+=("$dep")
+            fi
+        done
+
+        # Remove duplicates
+        if [[ ${#packages_to_download[@]} -gt 0 ]]; then
+            IFS=$'\n' packages_to_download=($(printf '%s\n' "${packages_to_download[@]}" | sort -u))
+            log "    Found ${#packages_to_download[@]} new dependencies to resolve"
+        fi
+    done
+
+    # Clean up temporary packages files
+    rm -f "$TEMP_DIR"/Packages_*_$$.gz
 
     log "Dependency resolution completed. Total packages to download: ${#processed_packages[@]}"
 
