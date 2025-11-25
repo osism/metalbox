@@ -1,0 +1,10 @@
+---
+- name: Prepare mirroring of ironic images
+  hosts: all
+
+  tasks:
+    - name: Install required packages
+      become: true
+      ansible.builtin.apt:
+        name:
+          - wget
