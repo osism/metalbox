@@ -399,12 +399,19 @@
 
                 - name: Configure NetworkPort
                   vars:
-                    oem_config:
+                    oem_config_v1:
                       Oem:
                         Cisco:
                           VicPort:
                             AdminFecMode: "Off"
                             AdminLinkSpeed: "Auto"
+                    oem_config_v2:
+                      Oem:
+                        Cisco:
+                          VicPort:
+                            AdminFecMode: "Off"
+                            ConfiguredLinkSpeed: "Auto"
+                    oem_config: "{{ oem_config_v1 if 'AdminLinkSpeed' in item.json.Oem.Cisco.VicPort else oem_config_v2 }}"
                   delegate_to: localhost
                   ansible.builtin.uri:
                     url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ item.item }}"
