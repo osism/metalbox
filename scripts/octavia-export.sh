@@ -69,6 +69,19 @@ fi
 
 echo -e "${GREEN}Image file downloaded successfully${NC}"
 
+# Download the checksum file
+CHECKSUM_FILENAME="${IMAGE_FILENAME}.CHECKSUM"
+echo -e "${YELLOW}Downloading checksum file: ${CHECKSUM_FILENAME}...${NC}"
+CHECKSUM_URL="${OCTAVIA_BASE_URL}/${CHECKSUM_FILENAME}"
+CHECKSUM_PATH="${TEMP_WORK_DIR}/${CHECKSUM_FILENAME}"
+
+if ! wget -q -O "$CHECKSUM_PATH" "$CHECKSUM_URL"; then
+    echo -e "${RED}Error: Failed to download checksum file from ${CHECKSUM_URL}${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Checksum file downloaded successfully${NC}"
+
 # Verify both files exist
 if [[ ! -f "$METADATA_PATH" ]]; then
     echo -e "${RED}Error: Metadata file not found at ${METADATA_PATH}${NC}"
@@ -77,6 +90,11 @@ fi
 
 if [[ ! -f "$IMAGE_PATH" ]]; then
     echo -e "${RED}Error: Image file not found at ${IMAGE_PATH}${NC}"
+    exit 1
+fi
+
+if [[ ! -f "$CHECKSUM_PATH" ]]; then
+    echo -e "${RED}Error: Checksum file not found at ${CHECKSUM_PATH}${NC}"
     exit 1
 fi
 
@@ -124,8 +142,17 @@ if ! sudo cp "$IMAGE_PATH" "$TEMP_MOUNT_DIR/$IMAGE_FILENAME"; then
     exit 1
 fi
 
+# Copy checksum file
+echo -e "  Copying ${CHECKSUM_FILENAME}..."
+if ! sudo cp "$CHECKSUM_PATH" "$TEMP_MOUNT_DIR/$CHECKSUM_FILENAME"; then
+    echo -e "${RED}Error: Failed to copy ${CHECKSUM_FILENAME} to image${NC}"
+    sudo umount "$TEMP_MOUNT_DIR"
+    rm -f "$OCTAVIA_EXPORT_IMAGE"
+    exit 1
+fi
+
 echo -e "${YELLOW}Unmounting image...${NC}"
 sudo umount "$TEMP_MOUNT_DIR"
 
 echo -e "${GREEN}Octavia export image created successfully: ${OCTAVIA_EXPORT_IMAGE}${NC}"
-echo -e "${GREEN}Contains: ${OCTAVIA_METADATA_FILE} and ${IMAGE_FILENAME}${NC}"
+echo -e "${GREEN}Contains: ${OCTAVIA_METADATA_FILE}, ${IMAGE_FILENAME}, and ${CHECKSUM_FILENAME}${NC}"
