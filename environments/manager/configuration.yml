@@ -68,17 +68,17 @@ netbox_service_allow_restart: false
 netbox_api_url: "http://192.168.42.10:8121"
 
 netbox_filter_conductor_ironic:
-  - state: active
+  - status: active
     site: Discworld
     tag:
       - managed-by-ironic
 netbox_filter_conductor_sonic:
-  - state: active
+  - status: active
     site: Discworld
     tag:
       - managed-by-metalbox
 netbox_filter_inventory:
-  - state: active
+  - status: active
     site: Discworld
     tag:
       - managed-by-ironic
