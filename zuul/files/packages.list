@@ -508,6 +508,7 @@ netdata
 netplan-generator
 netplan.io
 networkd-dispatcher
+nfs-common
 nftables
 ntfs-3g
 numactl
