@@ -1,0 +1,197 @@
+#!/usr/bin/python3
+
+import os
+import requests
+import json
+import sys
+import time
+
+
+valid_commands = ["discovery", "upgrade"]
+valid_boot_options = ["Immediate", "OnNextBoot"]
+valid_transfer_protocols = [
+    "VMEDIA-HTTP",
+    "VMEDIA-CIFS",
+    "VMEDIA-HTTPS",
+    "VMEDIA-NFS",
+    "CIFS",
+    "HTTPS",
+    "NFS",
+    "LOCAL-HOST",
+]
+default_image_repository = "http://metalbox/firmware"
+default_tls_verify = False
+default_redfish_user = "admin"
+default_redfish_password = None
+
+
+def help():
+    print(
+        f"""
+Usage: {sys.argv[0]} <{'|'.join(valid_commands)}> <CISCO HUU image> <CIMC URL>
+
+Configuration options set via environment:
+
+IMAGE_REPOSITORY_BASE_URL: Base URL of the image repository
+TRANSFER_PROTOCOL: Transfer protocol used to access the image repository. Valid options <{"|".join(valid_transfer_protocols)}>. Default: '{valid_transfer_protocols[0]}'
+BOOT_OPTION: Boot option to use. Valid options <{"|".join(valid_boot_options)}>. Default: '{valid_boot_options[0]}'
+TLS_VERIFY: Verify TLS connections. Default: <{str(default_tls_verify)}>
+REDFISH_USER: Redfish user used for CIMC authentication. Default <{default_redfish_user}>
+REDFISH_PASSWORD: Redfish PASSWORD used for CIMC authentication. Default <{str(default_redfish_password)}>
+"""
+    )
+
+
+def _command(endpoint, payload):
+    with requests.Session() as session:
+        if redfish_user and redfish_password:
+            session.auth = (redfish_user, redfish_password)
+        session.verify = tls_verify
+        if not session.verify:
+            requests.urllib3.disable_warnings(
+                requests.urllib3.exceptions.InsecureRequestWarning
+            )
+        response = session.post(cimc_url + endpoint, data=json.dumps(payload))
+        response.raise_for_status()
+        body = response.json()
+        task_endpoint = body["@odata.id"]
+        task_id = body["Id"]
+        task_state = body["TaskState"]
+        percent_complete = body["PercentComplete"]
+        print(
+            f"Task ID: {task_id}, State: {task_state}, Completed: {percent_complete}%",
+            end="",
+            flush=True,
+        )
+        prev_task_state = task_state
+        prev_percent_complete = percent_complete
+        prev_messages = []
+
+        while prev_task_state in ["New", "Running", "Interrupted"]:
+            time.sleep(5)
+            try:
+                response = session.get(cimc_url + task_endpoint)
+                response.raise_for_status()
+            except Exception as exc:
+                # NOTE: BMC updates may cause connection issues, keep trying
+                print(f"\nCaught exception: {exc}")
+                print(
+                    "Remember the CIMC may not be reachable immediately after upgrades. Will keep trying.."
+                )
+                continue
+            body = response.json()
+            task_state = body["TaskState"]
+            percent_complete = body["PercentComplete"]
+            messages = body["Messages"]
+            if (
+                task_state != prev_task_state
+                or percent_complete != prev_percent_complete
+            ):
+                print(
+                    f"\nTask ID: {task_id}, State: {task_state}, Completed: {percent_complete}%",
+                    end="",
+                    flush=True,
+                )
+            else:
+                print(".", end="", flush=True)
+            new_messages = [msg for msg in messages if msg not in prev_messages]
+            if new_messages:
+                print("\n", end="", flush=True)
+                for message in new_messages:
+                    print(f"{message['Severity']}: {message['Message']}")
+                    if "Resolution" in message and message["Resolution"] != "None":
+                        print(f"Resolution: {message['Resolution']}")
+                print(
+                    f"Task ID: {task_id}, State: {task_state}, Completed: {percent_complete}%",
+                    end="",
+                    flush=True,
+                )
+            prev_task_state = task_state
+            prev_percent_complete = percent_complete
+            prev_messages = messages
+            if "TaskStatus" in body:
+                print(f"\nStatus: {body['TaskStatus']}", end="", flush=True)
+
+        print("\n", end="", flush=True)
+
+        response = session.get(cimc_url + "/redfish/v1/UpdateService/FirmwareInventory")
+        response.raise_for_status()
+        body = response.json()
+        fw_inventory_endpoints = [member["@odata.id"] for member in body["Members"]]
+        for fw_endpoint in fw_inventory_endpoints:
+            response = session.get(cimc_url + fw_endpoint)
+            response.raise_for_status()
+            body = response.json()
+            print(f"{body['Name']}: {body['Version']}")
+
+
+def discovery():
+    payload = {
+        "Mode": "Discovery",
+        "BootOption": boot_option,
+        "ImageRepository": image_repository + huu_iso,
+        "TransferProtocol": transfer_protocol,
+    }
+    endpoint = (
+        "/redfish/v1/Managers/CIMC/Actions/Oem/CiscoUCSExtensions.HostOSBootManagement"
+    )
+
+    _command(endpoint, payload)
+
+
+def upgrade():
+    payload = {
+        "ApplyTime": boot_option,
+        "Targets": [],
+        "ForceUpdate": True,
+        "ImageRepository": image_repository + huu_iso,
+        "TransferProtocol": transfer_protocol,
+    }
+    endpoint = "/redfish/v1/UpdateService/Actions/Oem/CiscoUCSExtensions.UCSUpdate"
+
+    _command(endpoint, payload)
+
+
+if len(sys.argv) < 4:
+    print("Invalid number of arguments")
+    help()
+    exit(1)
+
+command = sys.argv[1]
+if command not in valid_commands:
+    print("Invalid command")
+    help()
+    exit(1)
+
+huu_iso = str(sys.argv[2])
+if huu_iso.split(".")[-1].lower() != "iso":
+    print("Expecting the name of a CISCO HUU ISO, ending with '.iso'")
+    help()
+    exit(1)
+
+cimc_url = str(sys.argv[3])
+if not cimc_url.startswith("http://") and not cimc_url.startswith("https://"):
+    print("Expecting a CIMC URL with a valid scheme")
+    help()
+    exit(1)
+while cimc_url.endswith("/"):
+    cimc_url = cimc_url[0:-1]
+
+image_repository = str(os.getenv("IMAGE_REPOSITORY", default_image_repository))
+if not image_repository.endswith("/"):
+    image_repository += "/"
+
+transfer_protocol = str(os.getenv("TRANSFER_PROTOCOL", valid_transfer_protocols[0]))
+
+boot_option = str(os.getenv("BOOT_OPTION", valid_boot_options[0]))
+
+tls_verify = bool(os.getenv("TLS_VERIFY", default_tls_verify))
+
+redfish_user = str(os.getenv("REDFISH_USER", default_redfish_user))
+
+redfish_password = str(os.getenv("REDFISH_PASSWORD", default_redfish_password))
+
+if command == "discovery":
+    discovery()
+elif command == "upgrade":
+    upgrade()
