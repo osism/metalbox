@@ -177,7 +177,7 @@ if not cimc_url.startswith("http://") and not cimc_url.startswith("https://"):
 while cimc_url.endswith("/"):
     cimc_url = cimc_url[0:-1]
 
-image_repository = str(os.getenv("IMAGE_REPOSITORY", default_image_repository))
+image_repository = str(os.getenv("IMAGE_REPOSITORY_BASE_URL", default_image_repository))
 if not image_repository.endswith("/"):
     image_repository += "/"
 
