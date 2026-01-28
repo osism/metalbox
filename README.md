@@ -37,7 +37,8 @@
 1. Use the `osism-metalbox-image.raw` file as virtual media (vHDD).
 2. Use the `grml-small-2025.05-amd64.iso` file as virtual media (vDVD) and boot it.
 3. Write the Metalbox image with `dd if=/dev/sdc of=/dev/sda bs=4M status=progress` to
-   the first disk. Afterwards power off the node, remove all virtual media devices and
+   the first disk. Note that the exact names of the disks may vary depending on your server
+   type, use `lsblk` to verify. Afterwards power off the node, remove all virtual media devices and
    power on the node again.
 4. Import of the NetBox files.
    * Use the `netbox-export.img` file as virtual media (vHDD) and run `netbox-import.sh`
@@ -193,7 +194,7 @@ netbox-manager run --limit 300-node10
 Replace `registry.osism.tech/osism/inventory-reconciler:latest` and `registry-delta-YYYYMMDD-HHMM.tar.gz`
 as needed.
 
-1. Run `scripts/singe-image-export.sh registry.osism.tech/osism/inventory-reconciler:latest` on a local
+1. Run `scripts/single-image-export.sh registry.osism.tech/osism/inventory-reconciler:latest` on a local
    system to create a `registry-delta-YYYYMMDD-HHMM.tar.gz` file
 2. Copy `registry-delta-YYYYMMDD-HHMM.tar.gz` to `/home/dragon` on the Metalbox node
 3. Run `single-image-import.sh registry-delta-YYYYMMDD-HHMM.tar.gz` on the Metalbox node to import
