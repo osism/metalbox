@@ -4,8 +4,8 @@ images:
   - library/httpd:alpine
   - library/mariadb:11.7.2
   - library/mariadb:11.8.4
-  - library/postgres:16.9-alpine
   - library/postgres:16.11-alpine
+  - library/postgres:16.9-alpine
   - library/redis:7.4.4-alpine
   - library/redis:7.4.7-alpine
   - library/traefik:v3.4.1
@@ -28,6 +28,7 @@ images_manager:
   - osism:latest
   - rsync:latest
   - seed:latest
+  - tempest:latest
 
 images_kolla_metalbox:
   - cron:2024.2
