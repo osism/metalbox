@@ -192,42 +192,75 @@ def extract_config_values(local_context_data, custom_fields):
     """
     Extract required configuration values from local_context_data and custom_fields.
 
-    Args:
-        local_context_data: Device's local_context_data dictionary
-        custom_fields: Device's custom_fields dictionary
-
-    Returns:
-        dict: Extracted configuration values
+    Behavior:
+    - Copies selected values from local_context_data.
+    - Copies ALL custom_fields except "secrets".
+    - Expands the "secrets" custom field into individual variables.
+    - Automatically tags Ansible Vault strings with !vault for proper YAML output.
     """
+
+    # Final dictionary that will be written to group_vars
     config = {}
 
-    # Extract netbox_secondaries if present
-    if "netbox_secondaries" in local_context_data:
-        config["netbox_secondaries"] = local_context_data["netbox_secondaries"]
+    # ---------------------------------------------------------
+    # 1) Extract selected values from local_context_data
+    # ---------------------------------------------------------
+    # Only copy specific known keys. This prevents dumping
+    # unrelated context values into group_vars unintentionally.
+    for key in ("netbox_secondaries", "chrony_servers"):
+        if key in local_context_data:
+            config[key] = local_context_data[key]
 
-    # Extract chrony_servers if present
-    if "chrony_servers" in local_context_data:
-        config["chrony_servers"] = local_context_data["chrony_servers"]
+    # ---------------------------------------------------------
+    # 2) Copy ALL custom fields except "secrets"
+    # ---------------------------------------------------------
+    # This ensures we do not ignore other custom fields.
+    # We skip "secrets" here because it is handled separately
+    # with special logic below.
+    if custom_fields:
+        for key, value in custom_fields.items():
+            # Skip secrets (handled later)
+            if key == "secrets":
+                continue
 
-    # Extract individual secrets from custom field if present
-    # Access custom_fields as dictionary and extract each secret separately
-    if custom_fields and "secrets" in custom_fields and custom_fields["secrets"]:
-        secrets = custom_fields["secrets"]
-        # If secrets is a dictionary, extract each secret as a separate parameter
+            # Only include fields that actually have a value
+            if value is not None:
+                config[key] = value
+
+    # ---------------------------------------------------------
+    # 3) Special handling for "secrets" custom field
+    # ---------------------------------------------------------
+    # The secrets field may contain:
+    #   - A dictionary of multiple secrets
+    #   - A single string value
+    #   - An Ansible Vault encrypted value
+    #
+    # We expand secrets into top-level variables so Ansible
+    # can use them directly.
+    secrets = (custom_fields or {}).get("secrets")
+
+    if secrets:
+
+        # Case A: secrets is a dictionary
         if isinstance(secrets, dict):
             for secret_key, secret_value in secrets.items():
-                # Check if the value is an Ansible Vault encrypted string
-                if isinstance(secret_value, str) and secret_value.strip().startswith(
-                    "$ANSIBLE_VAULT"
+
+                # If the value looks like an Ansible Vault string,
+                # wrap it in VaultString so the YAML dumper adds
+                # the !vault tag and preserves literal formatting.
+                if (
+                    isinstance(secret_value, str)
+                    and secret_value.strip().startswith("$ANSIBLE_VAULT")
                 ):
-                    # Mark as VaultString so YAML dumper adds !vault tag
                     config[secret_key] = VaultString(secret_value)
                 else:
                     config[secret_key] = secret_value
+
+        # Case B: secrets is a single value (not a dict)
         else:
-            # If secrets is not a dictionary, store it as a single value
-            if isinstance(secrets, str) and secrets.strip().startswith(
-                "$ANSIBLE_VAULT"
+            if (
+                isinstance(secrets, str)
+                and secrets.strip().startswith("$ANSIBLE_VAULT")
             ):
                 config["netbox_secrets"] = VaultString(secrets)
             else:
