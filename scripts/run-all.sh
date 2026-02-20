@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 MANAGED_SITE="$1"
+ENABLE_SONIC="${ENABLE_SONIC:-true}"
 
 wait_for_container_healthy() {
     local max_attempts=60
@@ -34,7 +35,9 @@ osism apply memcached
 osism apply rabbitmq
 osism apply mariadb
 osism apply httpd
-/opt/configuration/scripts/sonic-import.sh
+if [[ "$ENABLE_SONIC" == "true" ]]; then
+    /opt/configuration/scripts/sonic-import.sh
+fi
 osism apply dnsmasq
 osism apply keystone
 osism apply ironic

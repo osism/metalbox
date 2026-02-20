@@ -4,6 +4,7 @@
 
 dnsmasq_enable_dns: true
 dnsmasq_enable_tftp: false
+# NOTE: The following dnsmasq DHCP settings are only required if SONiC is used.
 dnsmasq_dhcp_vendorclass:
   - set:onie,onie_vendor
 dnsmasq_dhcp_options:
@@ -18,7 +19,7 @@ httpd_host: 0.0.0.0
 httpd_port: 80
 
 ##########################################################
-# sonic-ztp
+# sonic-ztp (only required if SONiC is used)
 
 httpd_sonic_ztp_enable: true
 httpd_sonic_ztp_firmware: sonic-broadcom-enterprise-base-4.4.2.bin
