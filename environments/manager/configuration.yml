@@ -90,6 +90,7 @@ netbox_data_types:
   - gnmic_parameters
   - netplan_parameters
   - primary_ip
+  - secrets
 
 manager_inventory_from_netbox: true
 manager_inventory_reconciler_mode: metalbox
