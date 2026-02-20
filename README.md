@@ -7,7 +7,7 @@
    `osism-metalbox-image.raw`.
 2. Download the latest small [Grml](https://grml.org/download/) live ISO file.
    When creating this document, the file name was `grml-small-2025.05-amd64.iso`.
-3. Download the SONiC export image `sonic-export.img` from the well known URL. You can also
+3. If SONiC is to be used: Download the SONiC export image `sonic-export.img` from the well known URL. You can also
    create this file locally by running `sonic-export.sh` inside a directory containing
    your SONiC images.
 4. Export the NetBox configuration repository with `netbox-manager export-archive -i`.
@@ -62,11 +62,13 @@
       Cloudpod do all steps in "Using the Metalbox as an Ubuntu repository server".
     *  <ins>OR</ins> Disable the use of the Metalbox as repository server by running
       `disable-repository.sh`.
-16. Import of the SONiC files.
-    * Use the file `sonic-export.img` as virtual media (vHDD) and run `deploy-sonic.sh` to deploy
-      the SONiC ZTP services. Afterwards remove the virtual media (vHDD).
-    * <ins>OR</ins> Copy the `sonic-export.img` file to `/home/dragon` and run `mount-images.sh`.
-      Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards run `unmount-images.sh`.
+16. Use as SONiC ZTP server.
+    * If the Metalbox is to be used as a SONiC ZTP server, import the SONiC files:
+      * Use the file `sonic-export.img` as virtual media (vHDD) and run `deploy-sonic.sh` to deploy
+        the SONiC ZTP services. Afterwards remove the virtual media (vHDD).
+      * <ins>OR</ins> Copy the `sonic-export.img` file to `/home/dragon` and run `mount-images.sh`.
+        Run `deploy-sonic.sh` to deploy the SONiC ZTP services. Afterwards run `unmount-images.sh`.
+    * <ins>OR</ins> Disable the use of SONiC by running `disable-sonic.sh`.
 17. Run `deploy-infrastructure.sh` to deploy the infrastructure services.
 18. Run `deploy-openstack.sh` to Deploy the OpenStack services.
 19. Upload the Ironic image files to `/opt/httpd/data/root`.
@@ -76,6 +78,9 @@
       steps in "Using Metalbox as a full container registry".
     * If the Metalbox is to be used as a file server for nodes inside the Cloudpod do all
       steps in "Using Metalbox as a file server".
+
+**Note:** When using `run-all.sh`, the SONiC deployment steps can be skipped by setting
+`ENABLE_SONIC=false` (e.g. `ENABLE_SONIC=false ./run-all.sh SITE`). By default, SONiC is enabled.
 
 ### Additional steps for air gap environments
 
