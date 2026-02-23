@@ -2,7 +2,7 @@
 - secret:
     name: SECRET_METALBOX
     data:
-      MINIO_ACCESS_KEY: !encrypted/pkcs1-oaep
+      ACCESS_KEY: !encrypted/pkcs1-oaep
         - hgmRMzyDqj5ANem0+ZXN9Fl/OjPJoNhhO+XBAS/qbjwWBnpC6/FVvXtfabl9/IXCN067s
           /X9raFBxcvoaiMwBHL7/+uOcxTG160QmURvQKQWf46joT8GEnw5xEPOR5E9LAQ6unh4tY
           T937Xww8Z9TPnHu/U2imqOiuiUpo+I3uCN/i6bnFqWvEo5HUDJ5QXMtWNicbvv+QMV1nb
@@ -13,7 +13,7 @@
           hLtj1eiQJY35QseZxT/ITJvFvfaTzNQMJmPhXi9J6DS/QsC3QF1JBjuDyio7D68oPk7+z
           H2c02vFoRsDElTZyDyb1dkBWvXFvJFl7T8K0VSS8L5Mp4W+Qu1jMknX1B1y9aamHVrxDy
           L/HLtD70Vp2r7Od8pJODDQLkZsX0FEdrPtChcrRhSwCzWrT8cKo1arfI8PlpwM=
-      MINIO_SECRET_KEY: !encrypted/pkcs1-oaep
+      SECRET_KEY: !encrypted/pkcs1-oaep
         - DCwCuqa8RApMO4frYARfqODmruxSKMjVwQMF0Dl2k4CEE0QYQusWLPlijTIG5AunlBO88
           1s+hwk0syZltJRv0LJmtoPXGrxK8m9Go4BIbS6Mm52EDHNk5J+lQNoaRydijK5y+mfhOS
           VGVrQSvXJbAu5EwprnL3wgUTe54jHWEmhBw7G4zzxS24kLL5Mmk6ohSy/kCcdC1CLDEad

@@ -7,7 +7,7 @@
 
   vars:
     docker_registry: registry.osism.tech
-    minio_url: https://nbg1.your-objectstorage.com
+    s3_endpoint: https://nbg1.your-objectstorage.com
     _publish: "{{ publish | default(False) }}"
     _full: "{{ full | default(False) }}"
 
@@ -87,38 +87,47 @@
         - _publish | bool
         - result.stat.exists
 
-    - name: Prepare upload script
-      ansible.builtin.shell:  # noqa command-instead-of-module
-        executable: /bin/bash
-        cmd: |
-          wget https://dl.min.io/client/mc/release/linux-amd64/mc
-          chmod +x mc
-          ./mc alias set minio {{ minio_url }} {{ secret.MINIO_ACCESS_KEY | trim }} {{ secret.MINIO_SECRET_KEY | trim }}
+    - name: Install rclone
+      become: true
+      ansible.builtin.apt:
+        name: rclone
+        state: present
+        update_cache: true
       when: _publish | bool
-      no_log: true
-      changed_when: true
 
-    - name: Run upload script (metalbox)
+    - name: Run upload (metalbox)
       ansible.builtin.shell:  # noqa command-instead-of-module
         executable: /bin/bash
         cmd: |
           sha256sum registry.tar.bz2 > registry.tar.bz2.CHECKSUM
-          ./mc cp registry.tar.bz2.CHECKSUM minio/osism/metalbox/
-          ./mc cp registry.tar.bz2 minio/osism/metalbox/
+          rclone copyto registry.tar.bz2.CHECKSUM s3:osism/metalbox/registry.tar.bz2.CHECKSUM
+          rclone copyto registry.tar.bz2 s3:osism/metalbox/registry.tar.bz2
+      environment:
+        RCLONE_CONFIG_S3_TYPE: s3
+        RCLONE_CONFIG_S3_PROVIDER: Other
+        RCLONE_CONFIG_S3_ENDPOINT: "{{ s3_endpoint }}"
+        RCLONE_CONFIG_S3_ACCESS_KEY_ID: "{{ secret.ACCESS_KEY | trim }}"
+        RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "{{ secret.SECRET_KEY | trim }}"
       when:
         - not _full | bool
         - _publish | bool
       no_log: true
       changed_when: true
 
-    - name: Run upload script (full)
+    - name: Run upload (full)
       ansible.builtin.shell:  # noqa command-instead-of-module
         executable: /bin/bash
         cmd: |
           mv registry.tar.bz2 registry-full.tar.bz2
           sha256sum registry-full.tar.bz2 > registry-full.tar.bz2.CHECKSUM
-          ./mc cp registry-full.tar.bz2.CHECKSUM minio/osism/metalbox/
-          ./mc cp registry-full.tar.bz2 minio/osism/metalbox/
+          rclone copyto registry-full.tar.bz2.CHECKSUM s3:osism/metalbox/registry-full.tar.bz2.CHECKSUM
+          rclone copyto registry-full.tar.bz2 s3:osism/metalbox/registry-full.tar.bz2
+      environment:
+        RCLONE_CONFIG_S3_TYPE: s3
+        RCLONE_CONFIG_S3_PROVIDER: Other
+        RCLONE_CONFIG_S3_ENDPOINT: "{{ s3_endpoint }}"
+        RCLONE_CONFIG_S3_ACCESS_KEY_ID: "{{ secret.ACCESS_KEY | trim }}"
+        RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "{{ secret.SECRET_KEY | trim }}"
       when:
         - _full | bool
         - _publish | bool

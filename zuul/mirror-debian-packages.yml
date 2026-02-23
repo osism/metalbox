@@ -5,7 +5,7 @@
   vars:
     _publish: "{{ publish | default(False) }}"
     docker_registry: quay.io
-    minio_url: https://nbg1.your-objectstorage.com
+    s3_endpoint: https://nbg1.your-objectstorage.com
 
   tasks:
     - name: Run mirror script
@@ -42,6 +42,14 @@
       changed_when: true
 
 
+    - name: Install rclone
+      become: true
+      ansible.builtin.apt:
+        name: rclone
+        state: present
+        update_cache: true
+      when: _publish | default(false) | bool
+
     - name: Run push and upload script
       ansible.builtin.shell:
         executable: /bin/bash
@@ -54,11 +62,14 @@
           version=$(date +%Y%m%d)
           docker push "quay.io/osism-mirror/ubuntu-noble:$version"
 
-          wget https://dl.min.io/client/mc/release/linux-amd64/mc
-          chmod +x mc
-          ./mc alias set minio {{ minio_url }} {{ secret.MINIO_ACCESS_KEY | trim }} {{ secret.MINIO_SECRET_KEY | trim }}
-          ./mc cp ubuntu-noble.tar.bz2.CHECKSUM minio/osism/metalbox/
-          ./mc cp ubuntu-noble.tar.bz2 minio/osism/metalbox/
+          rclone copyto ubuntu-noble.tar.bz2.CHECKSUM s3:osism/metalbox/ubuntu-noble.tar.bz2.CHECKSUM
+          rclone copyto ubuntu-noble.tar.bz2 s3:osism/metalbox/ubuntu-noble.tar.bz2
+      environment:
+        RCLONE_CONFIG_S3_TYPE: s3
+        RCLONE_CONFIG_S3_PROVIDER: Other
+        RCLONE_CONFIG_S3_ENDPOINT: "{{ s3_endpoint }}"
+        RCLONE_CONFIG_S3_ACCESS_KEY_ID: "{{ secret.ACCESS_KEY | trim }}"
+        RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "{{ secret.SECRET_KEY | trim }}"
       when: _publish | default(false) | bool
       changed_when: true
       no_log: true

@@ -5,7 +5,7 @@
   vars:
     _openstack_version: "{{ openstack_version | default('2024.2') }}"
     _publish: "{{ publish | default(False) }}"
-    minio_url: https://nbg1.your-objectstorage.com
+    s3_endpoint: https://nbg1.your-objectstorage.com
 
   tasks:
     - name: Run export script
@@ -21,7 +21,15 @@
           bash scripts/octavia-export.sh {{ _openstack_version }}
       changed_when: true
 
-    - name: Run push and upload script
+    - name: Install rclone
+      become: true
+      ansible.builtin.apt:
+        name: rclone
+        state: present
+        update_cache: true
+      when: _publish | default(false) | bool
+
+    - name: Run upload
       ansible.builtin.shell:
         executable: /bin/bash
         chdir: "{{ zuul.project.src_dir | default('.') }}"
@@ -32,11 +40,14 @@
 
           sha256sum octavia-export-{{ _openstack_version }}.img > octavia-export-{{ _openstack_version }}.img.CHECKSUM
 
-          wget https://dl.min.io/client/mc/release/linux-amd64/mc
-          chmod +x mc
-          ./mc alias set minio {{ minio_url }} {{ secret.MINIO_ACCESS_KEY | trim }} {{ secret.MINIO_SECRET_KEY | trim }}
-          ./mc cp octavia-export-{{ _openstack_version }}.img.CHECKSUM minio/osism/metalbox/
-          ./mc cp octavia-export-{{ _openstack_version }}.img minio/osism/metalbox/
+          rclone copyto octavia-export-{{ _openstack_version }}.img.CHECKSUM s3:osism/metalbox/octavia-export-{{ _openstack_version }}.img.CHECKSUM
+          rclone copyto octavia-export-{{ _openstack_version }}.img s3:osism/metalbox/octavia-export-{{ _openstack_version }}.img
+      environment:
+        RCLONE_CONFIG_S3_TYPE: s3
+        RCLONE_CONFIG_S3_PROVIDER: Other
+        RCLONE_CONFIG_S3_ENDPOINT: "{{ s3_endpoint }}"
+        RCLONE_CONFIG_S3_ACCESS_KEY_ID: "{{ secret.ACCESS_KEY | trim }}"
+        RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "{{ secret.SECRET_KEY | trim }}"
       when: _publish | default(false) | bool
       changed_when: true
       no_log: true
