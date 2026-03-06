@@ -204,3 +204,15 @@ as needed.
 2. Copy `registry-delta-YYYYMMDD-HHMM.tar.gz` to `/home/dragon` on the Metalbox node
 3. Run `single-image-import.sh registry-delta-YYYYMMDD-HHMM.tar.gz` on the Metalbox node to import
    the image
+
+## Troubleshooting
+
+### Manual prepartion of the ironic volume
+
+```
+docker run --rm --name httpd-ironic \
+  --entrypoint /prepare-ironic-volume.sh \
+  -v /opt/httpd/configuration/prepare-ironic-volume.sh:/prepare-ironic-volume.sh \
+  -v ironic:/var/lib/ironic \
+  localhost:5001/library/httpd:alpine
+```
