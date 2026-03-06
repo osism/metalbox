@@ -71,7 +71,7 @@ echo "==> Output file: ${OUTPUT_FILE}"
 # Export image using skopeo to docker-archive format
 ARCHIVE_FILE="${TEMP_DIR}/image.tar"
 echo "==> Copying image to docker-archive format..."
-skopeo copy --retry-times 2 \
+skopeo copy --retry-times 2 --override-arch amd64 --override-os linux \
     "docker://${DOCKER_REGISTRY}/${IMAGE}" \
     "docker-archive:${ARCHIVE_FILE}:${DEST_IMAGE}"
 
