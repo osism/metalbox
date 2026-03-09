@@ -9,7 +9,7 @@ set -euo pipefail
 #   - Ironic runs in the default VRF (on metalbox device)
 #   - IPA agents run on bare-metal nodes in a separate VRF
 #   - Ironic needs outbound access to IPA on port 9999 (deploy steps)
-#   - IPA needs inbound access to httpd on port 80 and Ironic API on port 6385
+#   - IPA needs inbound access to httpd on ports 80/443 and Ironic API on port 6385
 #
 # Solution:
 #   A veth pair connects both VRFs at L3. SNAT/DNAT ensures source IPs are
@@ -26,7 +26,7 @@ set -euo pipefail
 #     -> Ironic receives reply
 #
 # Inbound packet flow (IPA -> httpd):
-#   IPA (VRF) -> LOOPBACK1_IP:80/6385
+#   IPA (VRF) -> LOOPBACK1_IP:80/443/6385
 #     -> DNAT rewrites dst to METALBOX_IP (metalbox in default VRF)
 #     -> crosses veth into default VRF
 #     -> httpd responds
@@ -187,7 +187,7 @@ ip route add "${MB_NETWORK}" via "${TRANSIT_IP_DEFAULT}" dev vrf-bridge1 table "
 #    through the veth, combined with ip rules that only apply to traffic
 #    arriving on the fabric-facing interfaces.
 #
-#    DNAT traffic (ports 80/6385) is not affected because DNAT rewrites the
+#    DNAT traffic (ports 80/443/6385) is not affected because DNAT rewrites the
 #    destination to METALBOX_IP before the routing decision — so the ip rule
 #    matching "to LOOPBACK1_IP" does not trigger for those packets.
 # -----------------------------------------------------------------------------
@@ -213,14 +213,14 @@ iptables -t nat -A POSTROUTING \
 
 # -----------------------------------------------------------------------------
 # 7. DNAT (inbound)
-#    IPA agents connect to LOOPBACK1_IP on port 80 (httpd) and 6385 (Ironic
-#    API). Both services run on METALBOX_IP in the default VRF. DNAT rewrites
+#    IPA agents connect to LOOPBACK1_IP on port 80 (httpd), 443 (https) and
+#    6385 (Ironic API). All services run on METALBOX_IP in the default VRF. DNAT rewrites
 #    the destination, the packet crosses the veth into the default VRF, and
 #    conntrack handles the reverse path automatically.
 # -----------------------------------------------------------------------------
-echo "INFO: [7/7] Adding DNAT rule (inbound: dst ${LOOPBACK1_IP}:80,6385 -> ${METALBOX_IP})..."
+echo "INFO: [7/7] Adding DNAT rule (inbound: dst ${LOOPBACK1_IP}:80,443,6385 -> ${METALBOX_IP})..."
 iptables -t nat -A PREROUTING \
-  -d "${LOOPBACK1_IP}/32" -p tcp -m multiport --dports 80,6385 \
+  -d "${LOOPBACK1_IP}/32" -p tcp -m multiport --dports 80,443,6385 \
   -j DNAT --to-destination "${METALBOX_IP}"
 
 echo "INFO: VRF bridge setup complete."
@@ -241,6 +241,7 @@ echo "INFO: VRF bridge setup complete."
 #
 # Inbound (IPA -> httpd):
 #   sudo ip vrf exec ${VRF_NAME} curl http://${LOOPBACK1_IP}:80/
+#   sudo ip vrf exec ${VRF_NAME} curl -k https://${LOOPBACK1_IP}:443/
 #   sudo ip vrf exec ${VRF_NAME} curl http://${LOOPBACK1_IP}:6385/
 #
 # =============================================================================
@@ -253,5 +254,5 @@ echo "INFO: VRF bridge setup complete."
 # ip route del "${BM_NETWORK}" via "${TRANSIT_IP_VRF}"
 # ip route del "${MB_NETWORK}" via "${TRANSIT_IP_DEFAULT}" table "${VRF_TABLE}"
 # iptables -t nat -D POSTROUTING -s "${TRANSIT_IP_DEFAULT}/${TRANSIT_CIDR}" -j SNAT --to-source "${LOOPBACK1_IP}"
-# iptables -t nat -D PREROUTING -d "${LOOPBACK1_IP}/32" -p tcp -m multiport --dports 80,6385 -j DNAT --to-destination "${METALBOX_IP}"
+# iptables -t nat -D PREROUTING -d "${LOOPBACK1_IP}/32" -p tcp -m multiport --dports 80,443,6385 -j DNAT --to-destination "${METALBOX_IP}"
 # ip link del vrf-bridge0
