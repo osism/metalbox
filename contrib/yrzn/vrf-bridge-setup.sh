@@ -49,9 +49,10 @@ VRF_TABLE="100"
 LOOPBACK1_DEV="loopback1"
 METALBOX_DEV="metalbox"
 
-# Bare-metal network (where IPA agents live, in VRF)
+# Bare-metal networks (where IPA agents live, in VRF)
 # Cannot be derived from loopback1 (which is a /32), must be set explicitly.
-BM_NETWORK="198.51.100.0/24"
+# Space-separated list of CIDRs, e.g. "198.51.100.0/21 203.0.113.0/21"
+BM_NETWORKS="198.51.100.0/24"
 
 # Transit network between the veth pair (link-local, arbitrary)
 TRANSIT_IP_DEFAULT="169.254.100.1"
@@ -119,7 +120,7 @@ print(n)
 echo "INFO: Detected LOOPBACK1_IP=${LOOPBACK1_IP} (from ${LOOPBACK1_DEV})"
 echo "INFO: Detected METALBOX_IP=${METALBOX_IP}/${METALBOX_CIDR} (from ${METALBOX_DEV})"
 echo "INFO: Derived MB_NETWORK=${MB_NETWORK}"
-echo "INFO: BM_NETWORK=${BM_NETWORK}, VRF=${VRF_NAME} (table ${VRF_TABLE})"
+echo "INFO: BM_NETWORKS=${BM_NETWORKS}, VRF=${VRF_NAME} (table ${VRF_TABLE})"
 
 # =============================================================================
 # Setup
@@ -175,8 +176,10 @@ fi
 #      (so httpd replies can reach back to the node)
 # -----------------------------------------------------------------------------
 echo "INFO: [4/7] Adding cross-VRF routes..."
-echo "INFO:   default VRF: ${BM_NETWORK} via ${TRANSIT_IP_VRF} dev vrf-bridge0"
-ip route add "${BM_NETWORK}" via "${TRANSIT_IP_VRF}" dev vrf-bridge0
+for bm_net in ${BM_NETWORKS}; do
+  echo "INFO:   default VRF: ${bm_net} via ${TRANSIT_IP_VRF} dev vrf-bridge0"
+  ip route add "${bm_net}" via "${TRANSIT_IP_VRF}" dev vrf-bridge0
+done
 echo "INFO:   VRF (table ${VRF_TABLE}): ${MB_NETWORK} via ${TRANSIT_IP_DEFAULT} dev vrf-bridge1"
 ip route add "${MB_NETWORK}" via "${TRANSIT_IP_DEFAULT}" dev vrf-bridge1 table "${VRF_TABLE}"
 
@@ -255,7 +258,9 @@ echo "INFO: VRF bridge setup complete."
 #   ip rule del iif "${iface}" to "${LOOPBACK1_IP}" lookup 200 priority 100
 # done
 # ip route del "${LOOPBACK1_IP}/32" table 200
-# ip route del "${BM_NETWORK}" via "${TRANSIT_IP_VRF}"
+# for bm_net in ${BM_NETWORKS}; do
+#   ip route del "${bm_net}" via "${TRANSIT_IP_VRF}"
+# done
 # ip route del "${MB_NETWORK}" via "${TRANSIT_IP_DEFAULT}" table "${VRF_TABLE}"
 # iptables -t nat -D POSTROUTING -s "${TRANSIT_IP_DEFAULT}/${TRANSIT_CIDR}" -j SNAT --to-source "${LOOPBACK1_IP}"
 # iptables -t nat -D PREROUTING -d "${LOOPBACK1_IP}/32" -p tcp -m multiport --dports "${DNAT_PORTS}" -j DNAT --to-destination "${METALBOX_IP}"
