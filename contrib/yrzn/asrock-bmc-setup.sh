@@ -152,10 +152,10 @@ echo ""
 
 # -- Step 2: Set BIOS Fixed Boot Order ----------------------------------------
 echo "[2/5] Setting BIOS Fixed Boot Order (via BIOS FutureState)..."
-echo "INFO: Target order: 1=USB CD/DVD, 2=Hard Disk, 3=NVME, 4-6=Disabled"
+echo "INFO: Target order: 1=USB CD/DVD, 2=Hard Disk, 3=NVME, 4-6=Disabled (UEFI + Fixed)"
 
-# FBO attributes use the pattern: FBO1XX = FBO1XX<DeviceType>
-# Patched via BIOS FutureState endpoint (Bios/SD)
+# FBO1xx = UEFI boot order, FBO2xx = Fixed boot order
+# Patched via BIOS FutureState endpoint (Bios/SD) in two requests
 http_code=$(redfish_patch "/Systems/Self/Bios/SD" '{
     "Attributes": {
         "FBO101": "FBO101USBCDDVD",
@@ -166,7 +166,19 @@ http_code=$(redfish_patch "/Systems/Self/Bios/SD" '{
         "FBO106": "FBO106Disabled"
     }
 }')
-check_http "$http_code" "Set BIOS Fixed Boot Order"
+check_http "$http_code" "Set UEFI Boot Order (FBO1xx)"
+
+http_code=$(redfish_patch "/Systems/Self/Bios/SD" '{
+    "Attributes": {
+        "FBO201": "FBO201USBCDDVD",
+        "FBO202": "FBO202HardDisk",
+        "FBO203": "FBO203NVME",
+        "FBO204": "FBO204Disabled",
+        "FBO205": "FBO205Disabled",
+        "FBO206": "FBO206Disabled"
+    }
+}')
+check_http "$http_code" "Set Fixed Boot Order (FBO2xx)"
 echo ""
 
 # -- Step 3: Disable UEFI PXE and Shell boot entries -------------------------
