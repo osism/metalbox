@@ -104,7 +104,7 @@ redfish_patch() {
     curl -sk -u "${BMC_USER}:${BMC_PASSWORD}" \
         -X PATCH \
         -H "Content-Type: application/json" \
-        "${etag_header[@]}" \
+        ${etag_header[@]+"${etag_header[@]}"} \
         -d "$data" \
         -o /dev/null \
         -w "%{http_code}" \
