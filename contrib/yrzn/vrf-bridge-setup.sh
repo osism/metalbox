@@ -208,14 +208,16 @@ done
 
 # -----------------------------------------------------------------------------
 # 6. SNAT (outbound)
-#    Traffic from the transit network gets LOOPBACK1_IP as source — the only
-#    address announced via BGP in the fabric. Without SNAT, the switches
-#    would not be able to route replies because the transit IPs are unknown
-#    in the fabric.
+#    All traffic leaving through vrf-bridge0 gets LOOPBACK1_IP as source —
+#    the only address announced via BGP in the fabric. The rule uses -I
+#    (insert) and matches on the outgoing interface rather than source IP
+#    to ensure it fires before Docker's MASQUERADE rules, which would
+#    otherwise rewrite the source to the transit IP (unreachable in the
+#    fabric). Without SNAT, the switches would not be able to route replies.
 # -----------------------------------------------------------------------------
-echo "INFO: [6/7] Adding SNAT rule (outbound: src ${TRANSIT_IP_DEFAULT}/${TRANSIT_CIDR} -> ${LOOPBACK1_IP})..."
-iptables -t nat -A POSTROUTING \
-  -s "${TRANSIT_IP_DEFAULT}/${TRANSIT_CIDR}" \
+echo "INFO: [6/7] Adding SNAT rule (outbound: out vrf-bridge0 -> ${LOOPBACK1_IP})..."
+iptables -t nat -I POSTROUTING \
+  -o vrf-bridge0 \
   -j SNAT --to-source "${LOOPBACK1_IP}"
 
 # -----------------------------------------------------------------------------
@@ -262,6 +264,6 @@ echo "INFO: VRF bridge setup complete."
 #   ip route del "${bm_net}" via "${TRANSIT_IP_VRF}"
 # done
 # ip route del "${MB_NETWORK}" via "${TRANSIT_IP_DEFAULT}" table "${VRF_TABLE}"
-# iptables -t nat -D POSTROUTING -s "${TRANSIT_IP_DEFAULT}/${TRANSIT_CIDR}" -j SNAT --to-source "${LOOPBACK1_IP}"
+# iptables -t nat -D POSTROUTING -o vrf-bridge0 -j SNAT --to-source "${LOOPBACK1_IP}"
 # iptables -t nat -D PREROUTING -d "${LOOPBACK1_IP}/32" -p tcp -m multiport --dports "${DNAT_PORTS}" -j DNAT --to-destination "${METALBOX_IP}"
 # ip link del vrf-bridge0
