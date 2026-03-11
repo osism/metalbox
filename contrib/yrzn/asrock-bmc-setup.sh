@@ -145,6 +145,7 @@ echo ""
 echo "[1/5] Verifying Redfish connectivity..."
 if ! redfish_get "/Systems/Self" > /dev/null 2>&1; then
     echo "ERROR: Cannot reach Redfish API at ${REDFISH_BASE}" >&2
+    echo "$(date '+%Y-%m-%d %H:%M:%S') ERROR: Cannot reach Redfish API at ${REDFISH_BASE} (BMC_HOST=${BMC_HOST})" >> asrock-bmc-setup.log
     exit 1
 fi
 echo "INFO: Redfish API reachable"
