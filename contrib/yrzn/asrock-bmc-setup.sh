@@ -130,6 +130,7 @@ check_http() {
         echo "INFO: $step - OK (HTTP $http_code)"
     else
         echo "ERROR: $step - FAILED (HTTP $http_code)" >&2
+        echo "$(date '+%Y-%m-%d %H:%M:%S') ERROR: $step - FAILED (HTTP $http_code) (BMC_HOST=${BMC_HOST})" >> asrock-bmc-setup.log
         return 1
     fi
 }
