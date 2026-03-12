@@ -9,7 +9,8 @@ set -euo pipefail
 #   - Ironic runs in the default VRF (on metalbox device)
 #   - IPA agents run on bare-metal nodes in a separate VRF
 #   - Ironic needs outbound access to IPA on port 9999 (deploy steps)
-#   - IPA needs inbound access to httpd on ports 80/443 and Ironic API on port 6385
+#   - IPA needs inbound access to httpd on ports 80/443, container registry on port 5000,
+#     and Ironic API on port 6385
 #     (configurable via DNAT_PORTS)
 #
 # Solution:
@@ -63,7 +64,7 @@ TRANSIT_CIDR="30"
 FABRIC_INTERFACES="data1 data2"
 
 # Ports to DNAT from LOOPBACK1_IP to METALBOX_IP (comma-separated)
-DNAT_PORTS="80,443,6385"
+DNAT_PORTS="80,443,5000,6385"
 
 # MTU for the veth pair (should match the fabric MTU)
 VETH_MTU="1500"
@@ -223,7 +224,7 @@ iptables -t nat -I POSTROUTING \
 # -----------------------------------------------------------------------------
 # 7. DNAT (inbound)
 #    IPA agents connect to LOOPBACK1_IP on the configured DNAT_PORTS
-#    (default: 80, 443, 6385). All services run on METALBOX_IP in the default VRF. DNAT rewrites
+#    (default: 80, 443, 5000, 6385). All services run on METALBOX_IP in the default VRF. DNAT rewrites
 #    the destination, the packet crosses the veth into the default VRF, and
 #    conntrack handles the reverse path automatically.
 # -----------------------------------------------------------------------------
@@ -251,6 +252,7 @@ echo "INFO: VRF bridge setup complete."
 # Inbound (IPA -> httpd):
 #   sudo ip vrf exec ${VRF_NAME} curl http://${LOOPBACK1_IP}:80/
 #   sudo ip vrf exec ${VRF_NAME} curl -k https://${LOOPBACK1_IP}:443/
+#   sudo ip vrf exec ${VRF_NAME} curl http://${LOOPBACK1_IP}:5000/v2/
 #   sudo ip vrf exec ${VRF_NAME} curl http://${LOOPBACK1_IP}:6385/
 #
 # =============================================================================
