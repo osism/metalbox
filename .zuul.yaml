@@ -52,11 +52,15 @@
     max: 1
 
 - semaphore:
-    name: semaphore-metalbox-mirror-container-images-publish
+    name: semaphore-metalbox-mirror-container-images-2024.2-publish
     max: 1
 
 - semaphore:
-    name: semaphore-metalbox-mirror-container-images-full-publish
+    name: semaphore-metalbox-mirror-container-images-2024.2-full-publish
+    max: 1
+
+- semaphore:
+    name: semaphore-metalbox-mirror-container-images-2025.1-full-publish
     max: 1
 
 - semaphore:
@@ -79,6 +83,7 @@
 
 - job:
     name: metalbox-mirror-container-images
+    abstract: true
     nodeset: ubuntu-noble-large
     pre-run: zuul/pre-mirror-container-images.yml
     run: zuul/mirror-container-images.yml
@@ -88,11 +93,28 @@
       - "^zuul/vars/container-images.yml"
 
 - job:
-    name: metalbox-mirror-container-images-full
+    name: metalbox-mirror-container-images-2024.2
+    parent: metalbox-mirror-container-images
+    timeout: 3600
+    vars:
+      full: false
+      openstack_version: "2024.2"
+
+- job:
+    name: metalbox-mirror-container-images-2024.2-full
     parent: metalbox-mirror-container-images
     timeout: 3600
     vars:
       full: true
+      openstack_version: "2024.2"
+
+- job:
+    name: metalbox-mirror-container-images-2025.1-full
+    parent: metalbox-mirror-container-images
+    timeout: 3600
+    vars:
+      full: true
+      openstack_version: "2025.1"
 
 - job:
     name: metalbox-mirror-octavia-image
@@ -117,26 +139,43 @@
         pass-to-parent: true
 
 - job:
-    name: metalbox-mirror-container-images-publish
-    parent: metalbox-mirror-container-images
+    name: metalbox-mirror-container-images-2024.2-publish
+    parent: metalbox-mirror-container-images-2024.2
     semaphores:
-      - name: semaphore-metalbox-mirror-container-images-publish
+      - name: semaphore-metalbox-mirror-container-images-2024.2-publish
     vars:
       publish: true
+      openstack_version: "2024.2"
     secrets:
       - name: secret
         secret: SECRET_METALBOX
         pass-to-parent: true
 
 - job:
-    name: metalbox-mirror-container-images-full-publish
-    parent: metalbox-mirror-container-images
+    name: metalbox-mirror-container-images-2024.2-full-publish
+    parent: metalbox-mirror-container-images-2024.2-full
     semaphores:
-      - name: semaphore-metalbox-mirror-container-images-full-publish
+      - name: semaphore-metalbox-mirror-container-images-2024.2-full-publish
     timeout: 3600
     vars:
       full: true
       publish: true
+      openstack_version: "2024.2"
+    secrets:
+      - name: secret
+        secret: SECRET_METALBOX
+        pass-to-parent: true
+
+- job:
+    name: metalbox-mirror-container-images-2025.1-full-publish
+    parent: metalbox-mirror-container-images-2025.1-full
+    semaphores:
+      - name: semaphore-metalbox-mirror-container-images-2025.1-full-publish
+    timeout: 3600
+    vars:
+      full: true
+      publish: true
+      openstack_version: "2025.1"
     secrets:
       - name: secret
         secret: SECRET_METALBOX
@@ -159,8 +198,9 @@
     default-branch: main
     check:
       jobs:
-        - metalbox-mirror-container-images
-        - metalbox-mirror-container-images-full
+        - metalbox-mirror-container-images-2024.2
+        - metalbox-mirror-container-images-2024.2-full
+        - metalbox-mirror-container-images-2025.1-full
         - metalbox-mirror-debian-packages
         - metalbox-mirror-octavia-image
         - ansible-lint
@@ -171,14 +211,17 @@
     periodic-daily:
       jobs:
         - ansible-lint
-        - metalbox-mirror-container-images-publish
-        - metalbox-mirror-container-images-full-publish
+        - metalbox-mirror-container-images-2024.2-publish
+        - metalbox-mirror-container-images-2024.2-full-publish
+        - metalbox-mirror-container-images-2025.1-full-publish
         - yamllint
     post:
       jobs:
-        - metalbox-mirror-container-images-publish:
+        - metalbox-mirror-container-images-2024.2-publish:
             branches: main
-        - metalbox-mirror-container-images-full-publish:
+        - metalbox-mirror-container-images-2024.2-full-publish:
+            branches: main
+        - metalbox-mirror-container-images-2025.1-full-publish:
             branches: main
         - metalbox-mirror-debian-packages-publish:
             branches: main
