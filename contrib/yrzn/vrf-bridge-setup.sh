@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "$(id -u)" -ne 0 ]]; then
+  echo "ERROR: This script must be run as root (use sudo)." >&2
+  exit 1
+fi
+
 # =============================================================================
 # VRF Bridge Setup: Default VRF <-> VRF
 # =============================================================================
