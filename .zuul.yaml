@@ -91,6 +91,8 @@
       - "^zuul/mirror-container-images.yml"
       - "^zuul/pre-mirror-container-images.yml"
       - "^zuul/vars/container-images.yml"
+      - "^zuul/vars/container-images-2024.2.yml"
+      - "^zuul/vars/container-images-2025.1.yml"
 
 - job:
     name: metalbox-mirror-container-images-2024.2
@@ -140,10 +142,12 @@
 
 - job:
     name: metalbox-mirror-container-images-2024.2-publish
-    parent: metalbox-mirror-container-images-2024.2
+    parent: metalbox-mirror-container-images
     semaphores:
       - name: semaphore-metalbox-mirror-container-images-2024.2-publish
+    timeout: 3600
     vars:
+      full: false
       publish: true
       openstack_version: "2024.2"
     secrets:
@@ -153,7 +157,7 @@
 
 - job:
     name: metalbox-mirror-container-images-2024.2-full-publish
-    parent: metalbox-mirror-container-images-2024.2-full
+    parent: metalbox-mirror-container-images
     semaphores:
       - name: semaphore-metalbox-mirror-container-images-2024.2-full-publish
     timeout: 3600
@@ -168,7 +172,7 @@
 
 - job:
     name: metalbox-mirror-container-images-2025.1-full-publish
-    parent: metalbox-mirror-container-images-2025.1-full
+    parent: metalbox-mirror-container-images
     semaphores:
       - name: semaphore-metalbox-mirror-container-images-2025.1-full-publish
     timeout: 3600
