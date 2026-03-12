@@ -8,6 +8,7 @@ CONTAINER_REGISTRY="${CONTAINER_REGISTRY:-localhost:5001}"
 REPOSITORY_IMAGE="${REPOSITORY_IMAGE:-osism/packages/ubuntu-noble}"
 SKIP_DOWNLOAD="${SKIP_DOWNLOAD:-false}"
 SKIP_PUSH="${SKIP_PUSH:-true}"
+DATA_DIRECTORY="${DATA_DIRECTORY:-/opt/httpd/data}"
 
 set -e
 
@@ -41,14 +42,8 @@ else
 fi
 
 echo "Loading container image from tarball..."
-# Extract the directory path and filename from TARBALL_PATH
-TARBALL_DIR="$(dirname "$TARBALL_PATH")"
-TARBALL_FILENAME="$(basename "$TARBALL_PATH")"
 
-# Load the container image from the tarball
-docker load -i "$TARBALL_PATH"
-
-# Get the loaded image name (assuming it's the first one loaded)
+# Load the container image from the tarball and capture the image name
 LOADED_IMAGE=$(docker load -i "$TARBALL_PATH" 2>&1 | grep "Loaded image" | cut -d: -f2- | xargs)
 
 if [ -z "$LOADED_IMAGE" ]; then
@@ -73,6 +68,14 @@ fi
 echo "Repository update completed successfully!"
 echo "Image available at: $TARGET_IMAGE"
 
-echo "Deploying httpd service to import/update repository..."
-osism apply httpd
-echo "httpd service deployment completed successfully!"
+# Sync repository data from the container image to the httpd data directory.
+# This replicates what the Ansible httpd role does via the httpd-data container:
+# the rsync base image's CMD is "rsync -avz /data/ /export/root/"
+echo "Syncing repository data to $DATA_DIRECTORY/root/ubuntu-noble..."
+sudo mkdir -p "$DATA_DIRECTORY/root"
+docker run --rm \
+    -e USER_ID="$(stat -c %u "$DATA_DIRECTORY")" \
+    -e GROUP_ID="$(stat -c %g "$DATA_DIRECTORY")" \
+    -v "$DATA_DIRECTORY:/export" \
+    "$TARGET_IMAGE"
+echo "Repository data sync completed successfully!"
