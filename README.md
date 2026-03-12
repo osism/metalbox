@@ -217,3 +217,16 @@ docker run --rm --name httpd-ironic \
   -v ironic:/var/lib/ironic \
   localhost:5001/library/httpd:alpine
 ```
+
+### Resumable downloads with aria2c
+
+Downloads from the Hetzner Object Storage can occasionally be interrupted. Use
+`aria2c` for resumable, multi-connection downloads:
+
+```
+aria2c -x 4 -s 4 --auto-file-renaming=false https://nbg1.your-objectstorage.com/osism/metalbox/ubuntu-noble.tar.bz2
+```
+
+Replace the URL as needed for other files. The `-x 4 -s 4` flags use 4 connections
+for faster downloads, and `--auto-file-renaming=false` prevents duplicate files on
+resume.
