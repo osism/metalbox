@@ -3,13 +3,15 @@
   hosts: all
 
   vars_files:
-    - vars/container-images.yml
+    - "vars/container-images.yml"
+    - "vars/container-images-{{ _openstack_version }}.yml"
 
   vars:
     docker_registry: registry.osism.tech
     s3_endpoint: https://nbg1.your-objectstorage.com
     _publish: "{{ publish | default(False) }}"
     _full: "{{ full | default(False) }}"
+    _openstack_version: "{{ openstack_version| default('2024.2') }}"
 
   tasks:
     - name: Create registry volume
@@ -36,6 +38,12 @@
       ansible.builtin.command:
         cmd: "skopeo copy --retry-times 2 --dest-tls-verify=false docker://{{ docker_registry }}/osism/{{ item }} docker://localhost:5000/osism/{{ item }}"
       loop: "{{ images_manager }}"
+      changed_when: false
+
+    - name: Copy osism images
+      ansible.builtin.command:
+        cmd: "skopeo copy --retry-times 2 --dest-tls-verify=false docker://{{ docker_registry }}/osism/{{ item }} docker://localhost:5000/osism/{{ item }}"
+      loop: "{{ images_osism }}"
       changed_when: false
 
     - name: Copy kolla images
@@ -71,12 +79,12 @@
     - name: Export registry volume
       community.docker.docker_container_exec:
         container: export
-        command: sh -c 'cd /volume && tar cjf /export/registry.tar.bz2 .'
+        command: "sh -c 'cd /volume && tar cjf /export/registry-{{ _openstack_version }}.tar.bz2 .'"
       when: _publish | bool
 
     - name: Get size of export archive
       ansible.builtin.stat:
-        path: registry.tar.bz2
+        path: "registry-{{ _openstack_version }}.tar.bz2"
       register: result
       when: _publish | bool
 
@@ -99,9 +107,9 @@
       ansible.builtin.shell:  # noqa command-instead-of-module
         executable: /bin/bash
         cmd: |
-          sha256sum registry.tar.bz2 > registry.tar.bz2.CHECKSUM
-          rclone copyto registry.tar.bz2.CHECKSUM s3:osism/metalbox/registry.tar.bz2.CHECKSUM
-          rclone copyto registry.tar.bz2 s3:osism/metalbox/registry.tar.bz2
+          sha256sum registry-{{ _openstack_version }}.tar.bz2 > registry-{{ _openstack_version }}.tar.bz2.CHECKSUM
+          rclone copyto registry-{{ _openstack_version }}.tar.bz2.CHECKSUM s3:osism/metalbox/registry-{{ _openstack_version }}.tar.bz2.CHECKSUM
+          rclone copyto registry-{{ _openstack_version }}.tar.bz2 s3:osism/metalbox/registry-{{ _openstack_version }}.tar.bz2
       environment:
         RCLONE_CONFIG_S3_TYPE: s3
         RCLONE_CONFIG_S3_PROVIDER: Other
@@ -118,10 +126,10 @@
       ansible.builtin.shell:  # noqa command-instead-of-module
         executable: /bin/bash
         cmd: |
-          mv registry.tar.bz2 registry-full.tar.bz2
-          sha256sum registry-full.tar.bz2 > registry-full.tar.bz2.CHECKSUM
-          rclone copyto registry-full.tar.bz2.CHECKSUM s3:osism/metalbox/registry-full.tar.bz2.CHECKSUM
-          rclone copyto registry-full.tar.bz2 s3:osism/metalbox/registry-full.tar.bz2
+          mv registry-{{ _openstack_version }}.tar.bz2 registry-{{ _openstack_version }}-full.tar.bz2
+          sha256sum registry-{{ _openstack_version }}-full.tar.bz2 > registry-{{ _openstack_version }}-full.tar.bz2.CHECKSUM
+          rclone copyto registry-{{ _openstack_version }}-full.tar.bz2.CHECKSUM s3:osism/metalbox/registry-{{ _openstack_version }}-full.tar.bz2.CHECKSUM
+          rclone copyto registry-{{ _openstack_version }}-full.tar.bz2 s3:osism/metalbox/registry-{{ _openstack_version }}-full.tar.bz2
       environment:
         RCLONE_CONFIG_S3_TYPE: s3
         RCLONE_CONFIG_S3_PROVIDER: Other
