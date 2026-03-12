@@ -123,6 +123,10 @@
     nodeset: ubuntu-noble-large
     pre-run: zuul/pre-mirror-octavia-image.yml
     run: zuul/mirror-octavia-image.yml
+    vars:
+      openstack_versions:
+        - "2024.2"
+        - "2025.1"
     files:
       - "^scripts/octavia-export.sh$"
       - "^zuul/mirror-octavia-image.yml"

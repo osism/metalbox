@@ -3,12 +3,11 @@
   hosts: all
 
   vars:
-    _openstack_version: "{{ openstack_version | default('2024.2') }}"
+    _openstack_versions: "{{ openstack_versions | default(['2024.2', '2025.1']) }}"
     _publish: "{{ publish | default(False) }}"
 
-
   tasks:
-    - name: Run export script
+    - name: Run export script for {{ item }}
       become: true
       ansible.builtin.shell:  # noqa command-instead-of-module
         executable: /bin/bash
@@ -18,8 +17,9 @@
           set -o pipefail
           set -x
 
-          bash scripts/octavia-export.sh {{ _openstack_version }}
+          bash scripts/octavia-export.sh {{ item }}
       changed_when: true
+      loop: "{{ _openstack_versions }}"
 
     - name: Install rclone
       become: true
@@ -29,7 +29,7 @@
         update_cache: true
       when: _publish | default(false) | bool
 
-    - name: Run upload
+    - name: Run upload for {{ item }}
       ansible.builtin.shell:
         executable: /bin/bash
         chdir: "{{ zuul.project.src_dir | default('.') }}"
@@ -38,10 +38,10 @@
           set -o pipefail
           set -x
 
-          sha256sum octavia-export-{{ _openstack_version }}.img > octavia-export-{{ _openstack_version }}.img.CHECKSUM
+          sha256sum octavia-export-{{ item }}.img > octavia-export-{{ item }}.img.CHECKSUM
 
-          rclone copyto octavia-export-{{ _openstack_version }}.img.CHECKSUM s3:osism/metalbox/octavia-export-{{ _openstack_version }}.img.CHECKSUM
-          rclone copyto octavia-export-{{ _openstack_version }}.img s3:osism/metalbox/octavia-export-{{ _openstack_version }}.img
+          rclone copyto octavia-export-{{ item }}.img.CHECKSUM s3:osism/metalbox/octavia-export-{{ item }}.img.CHECKSUM
+          rclone copyto octavia-export-{{ item }}.img s3:osism/metalbox/octavia-export-{{ item }}.img
       environment:
         RCLONE_CONFIG_S3_TYPE: s3
         RCLONE_CONFIG_S3_PROVIDER: Ceph
@@ -54,3 +54,4 @@
       when: _publish | default(false) | bool
       changed_when: true
       no_log: true
+      loop: "{{ _openstack_versions }}"
