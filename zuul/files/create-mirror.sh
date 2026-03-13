@@ -22,6 +22,7 @@ SUMMARY_SHOWN=false
 # Configuration
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 REPOSITORIES_CONF="${SCRIPT_DIR}/repositories.conf"
+REPOSITORIES_RESTRICTED_CONF="${SCRIPT_DIR}/repositories-restricted.conf"
 PACKAGES_LIST="${SCRIPT_DIR}/packages.list"
 MIRROR_DIR="${MIRROR_DIR:-/tmp/repository}"
 LOG_FILE="${SCRIPT_DIR}/mirror.log"
@@ -110,6 +111,23 @@ read_config() {
     # Read packages (skip comments and empty lines)
     PACKAGES=($(grep -v '^#' "$PACKAGES_LIST" | grep -v '^[[:space:]]*$'))
 
+    # Read restricted repositories (only used for specific packages)
+    RESTRICTED_REPO_CONFIGS=()
+    declare -gA RESTRICTED_PACKAGES
+    if [[ -f "$REPOSITORIES_RESTRICTED_CONF" ]]; then
+        while IFS= read -r line; do
+            [[ "$line" =~ ^#.*$ || -z "${line// }" ]] && continue
+            local repo_part="${line%%=*}"
+            local packages_part="${line#*=}"
+            RESTRICTED_REPO_CONFIGS+=("$repo_part")
+            IFS=',' read -ra pkgs <<< "$packages_part"
+            for pkg in "${pkgs[@]}"; do
+                RESTRICTED_PACKAGES["$pkg"]=1
+            done
+        done < "$REPOSITORIES_RESTRICTED_CONF"
+        log "Found ${#RESTRICTED_REPO_CONFIGS[@]} restricted repositories for ${#RESTRICTED_PACKAGES[@]} packages"
+    fi
+
     log "Found ${#REPOSITORIES[@]} repositories and ${#PACKAGES[@]} packages"
     success "Configuration files read successfully"
 }
@@ -126,6 +144,58 @@ download_file() {
     else
         return 1
     fi
+}
+
+# Build Packages index URL for a repository
+# For flat repos (component="flat"), the Packages file is at $base_url/$dist/Packages.gz
+# For standard repos, it's at $base_url/dists/$dist/$component/binary-$arch/Packages.gz
+build_packages_url() {
+    local base_url="$1"
+    local dist="$2"
+    local component="$3"
+    local arch="$4"
+
+    if [[ "$component" == "flat" ]]; then
+        echo "$base_url/$dist/Packages.gz"
+    else
+        echo "$base_url/dists/$dist/$component/binary-$arch/Packages.gz"
+    fi
+}
+
+# Download a Packages index file, trying .gz, .xz, and uncompressed formats
+# Always stores result as .gz for consistent downstream processing
+download_packages_index() {
+    local packages_url="$1"
+    local output_file="$2"
+
+    # Try .gz first
+    if download_file "$packages_url" "$output_file" >/dev/null 2>&1 && [[ -s "$output_file" ]]; then
+        return 0
+    fi
+    rm -f "$output_file"
+
+    # Try .xz and convert to .gz
+    local xz_url="${packages_url%.gz}.xz"
+    local xz_file="${output_file%.gz}.xz"
+    if download_file "$xz_url" "$xz_file" >/dev/null 2>&1 && [[ -s "$xz_file" ]]; then
+        if xzcat "$xz_file" 2>/dev/null | gzip > "$output_file" 2>/dev/null && [[ -s "$output_file" ]]; then
+            rm -f "$xz_file"
+            return 0
+        fi
+    fi
+    rm -f "$xz_file" "$output_file"
+
+    # Try uncompressed and convert to .gz
+    local plain_url="${packages_url%.gz}"
+    local plain_file="${output_file%.gz}"
+    if download_file "$plain_url" "$plain_file" >/dev/null 2>&1 && [[ -s "$plain_file" ]]; then
+        if gzip -c "$plain_file" > "$output_file" 2>/dev/null && [[ -s "$output_file" ]]; then
+            rm -f "$plain_file"
+            return 0
+        fi
+    fi
+    rm -f "$plain_file" "$output_file"
+    return 1
 }
 
 # Parallel download function for a single URL
@@ -389,7 +459,7 @@ parallel_package_lookups() {
     printf '%s\n' "${packages[@]}" > "$package_list"
 
     # Export functions and variables needed by subprocesses
-    export -f parallel_package_lookup find_best_package find_package_info find_all_package_versions find_latest_netbird_version version_compare download_file cache_packages_file
+    export -f parallel_package_lookup find_best_package find_package_info find_all_package_versions find_latest_netbird_version version_compare download_file cache_packages_file build_packages_url
     export TEMP_DIR PACKAGES_CACHE_DIR
     export -A PACKAGES_METADATA_CACHE
 
@@ -453,12 +523,35 @@ cache_packages_file() {
 
     if [[ ! -f "$cache_file" ]]; then
         mkdir -p "$PACKAGES_CACHE_DIR"
-        if download_file "$packages_url" "$cache_file" >/dev/null 2>&1; then
+
+        # Try .gz first
+        if download_file "$packages_url" "$cache_file" >/dev/null 2>&1 && [[ -s "$cache_file" ]]; then
             return 0
-        else
-            rm -f "$cache_file"
-            return 1
         fi
+        rm -f "$cache_file"
+
+        # Try .xz and convert to .gz
+        local xz_url="${packages_url%.gz}.xz"
+        local xz_file="${cache_file%.gz}.xz"
+        if download_file "$xz_url" "$xz_file" >/dev/null 2>&1 && [[ -s "$xz_file" ]]; then
+            if xzcat "$xz_file" 2>/dev/null | gzip > "$cache_file" 2>/dev/null && [[ -s "$cache_file" ]]; then
+                rm -f "$xz_file"
+                return 0
+            fi
+        fi
+        rm -f "$xz_file" "$cache_file"
+
+        # Try uncompressed and convert to .gz
+        local plain_url="${packages_url%.gz}"
+        local plain_file="${cache_file%.gz}"
+        if download_file "$plain_url" "$plain_file" >/dev/null 2>&1 && [[ -s "$plain_file" ]]; then
+            if gzip -c "$plain_file" > "$cache_file" 2>/dev/null && [[ -s "$cache_file" ]]; then
+                rm -f "$plain_file"
+                return 0
+            fi
+        fi
+        rm -f "$plain_file" "$cache_file"
+        return 1
     fi
     return 0
 }
@@ -557,7 +650,7 @@ find_latest_netbird_version() {
         # Process each component
         IFS=',' read -ra COMP_ARRAY <<< "$components"
         for component in "${COMP_ARRAY[@]}"; do
-            local packages_url="$base_url/dists/$dist/$component/binary-$arch/Packages.gz"
+            local packages_url=$(build_packages_url "$base_url" "$dist" "$component" "$arch")
             local packages_file="$TEMP_DIR/Packages_$(basename "$packages_url" .gz)_$$.gz"
 
             if download_file "$packages_url" "$packages_file" >/dev/null 2>&1; then
@@ -626,7 +719,7 @@ find_all_package_versions() {
         # Process each component
         IFS=',' read -ra COMP_ARRAY <<< "$components"
         for component in "${COMP_ARRAY[@]}"; do
-            local packages_url="$base_url/dists/$dist/$component/binary-$arch/Packages.gz"
+            local packages_url=$(build_packages_url "$base_url" "$dist" "$component" "$arch")
             local packages_file="$TEMP_DIR/Packages_$(basename "$packages_url" .gz)_$$.gz"
 
             if download_file "$packages_url" "$packages_file" >/dev/null 2>&1; then
@@ -710,7 +803,7 @@ find_best_package() {
         # Process each component
         IFS=',' read -ra COMP_ARRAY <<< "$components"
         for component in "${COMP_ARRAY[@]}"; do
-            local packages_url="$base_url/dists/$dist/$component/binary-$arch/Packages.gz"
+            local packages_url=$(build_packages_url "$base_url" "$dist" "$component" "$arch")
             local package_info=$(find_package_info "$packages_url" "$package_name" "$base_url")
 
             if [[ -n "$package_info" ]]; then
@@ -750,7 +843,7 @@ preload_packages_metadata() {
 
         IFS=',' read -ra COMP_ARRAY <<< "$components"
         for component in "${COMP_ARRAY[@]}"; do
-            local packages_url="$base_url/dists/$dist/$component/binary-$arch/Packages.gz"
+            local packages_url=$(build_packages_url "$base_url" "$dist" "$component" "$arch")
             local cache_key=$(echo "$packages_url" | sed 's|[^a-zA-Z0-9]|_|g')
 
             if cache_packages_file "$packages_url"; then
@@ -860,17 +953,38 @@ download_packages() {
         local base_url="http://$host$path"
         log "Downloading package metadata from: $base_url $dist"
 
-        # Download all Packages.gz files for this repository
+        # Download all Packages index files for this repository
         IFS=',' read -ra COMP_ARRAY <<< "$components"
         for component in "${COMP_ARRAY[@]}"; do
-            local packages_url="$base_url/dists/$dist/$component/binary-$arch/Packages.gz"
+            local packages_url=$(build_packages_url "$base_url" "$dist" "$component" "$arch")
             local packages_file="$TEMP_DIR/Packages_${host//[^a-zA-Z0-9]/_}_${dist}_${component}_$$.gz"
 
-            if download_file "$packages_url" "$packages_file" >/dev/null 2>&1; then
+            if download_packages_index "$packages_url" "$packages_file"; then
                 packages_files+=("$packages_file")
                 log "  + Loaded: $dist/$component"
             else
                 log "  - Failed: $dist/$component"
+            fi
+        done
+    done
+
+    # Also load metadata from restricted repositories (for dependency resolution only)
+    for repo_config in "${RESTRICTED_REPO_CONFIGS[@]}"; do
+        IFS=':' read -r host path dist components arch <<< "$repo_config"
+
+        local base_url="http://$host$path"
+        log "Downloading package metadata from restricted repo: $base_url $dist"
+
+        IFS=',' read -ra COMP_ARRAY <<< "$components"
+        for component in "${COMP_ARRAY[@]}"; do
+            local packages_url=$(build_packages_url "$base_url" "$dist" "$component" "$arch")
+            local packages_file="$TEMP_DIR/Packages_${host//[^a-zA-Z0-9]/_}_${dist//\//_}_${component}_$$.gz"
+
+            if download_packages_index "$packages_url" "$packages_file"; then
+                packages_files+=("$packages_file")
+                log "  + Loaded (restricted): $dist/$component"
+            else
+                log "  - Failed (restricted): $dist/$component"
             fi
         done
     done
@@ -947,42 +1061,87 @@ download_packages() {
         esac
     done
 
-    # Perform parallel package lookups with enhanced batch processing
-    if [[ ${#packages_to_lookup[@]} -gt 0 ]]; then
-        log "Resolving download URLs for ${#packages_to_lookup[@]} packages..."
+    # Split packages into normal and restricted groups
+    local normal_packages_to_lookup=()
+    local restricted_packages_to_lookup=()
+    for package in "${packages_to_lookup[@]}"; do
+        if [[ -n "${RESTRICTED_PACKAGES[$package]+x}" ]]; then
+            restricted_packages_to_lookup+=("$package")
+        else
+            normal_packages_to_lookup+=("$package")
+        fi
+    done
 
-        # Process packages in batches for better memory management and server friendliness
-        local lookup_batch_size=$((PARALLEL_DOWNLOADS * LOOKUP_BATCH_SIZE))  # Process LOOKUP_BATCH_SIZE x parallel lookups at once
-        local all_download_urls=()
-        local total_lookup_batches=$(( (${#packages_to_lookup[@]} + lookup_batch_size - 1) / lookup_batch_size ))
+    local all_download_urls=()
 
-        for ((i=0; i<${#packages_to_lookup[@]}; i+=lookup_batch_size)); do
-            local batch=("${packages_to_lookup[@]:i:lookup_batch_size}")
+    # Pass 1: Look up normal packages from normal repositories only
+    if [[ ${#normal_packages_to_lookup[@]} -gt 0 ]]; then
+        log "Pass 1: Resolving ${#normal_packages_to_lookup[@]} normal packages from standard repositories..."
+
+        local lookup_batch_size=$((PARALLEL_DOWNLOADS * LOOKUP_BATCH_SIZE))
+        local total_lookup_batches=$(( (${#normal_packages_to_lookup[@]} + lookup_batch_size - 1) / lookup_batch_size ))
+
+        for ((i=0; i<${#normal_packages_to_lookup[@]}; i+=lookup_batch_size)); do
+            local batch=("${normal_packages_to_lookup[@]:i:lookup_batch_size}")
             local batch_num=$((i/lookup_batch_size + 1))
             local batch_start=$((i+1))
             local batch_end=$((i + ${#batch[@]}))
 
-            log "  Processing lookup batch $batch_num/$total_lookup_batches: packages $batch_start-$batch_end of ${#packages_to_lookup[@]}"
+            log "  Processing lookup batch $batch_num/$total_lookup_batches: packages $batch_start-$batch_end of ${#normal_packages_to_lookup[@]}"
 
-            # Add small delay between large batches to be server-friendly
             if [[ $batch_num -gt 1 ]] && [[ ${#batch[@]} -gt 50 ]]; then
                 log "    Adding brief delay to avoid overwhelming servers..."
                 sleep 2
             fi
 
-            # Use parallel package lookups to collect URLs for this batch
             parallel_package_lookups "$download_dir" "${batch[@]}"
+            all_download_urls+=("${PARALLEL_LOOKUP_URLS[@]}")
 
-            # Accumulate URLs from this batch
+            log "    Lookup batch $batch_num completed: found ${#PARALLEL_LOOKUP_URLS[@]} URLs to download"
+        done
+    fi
+
+    # Collect packages not found in normal repos (potential restricted-repo dependencies)
+    local not_found_in_normal=()
+    if [[ ${#PARALLEL_LOOKUP_NOT_FOUND[@]} -gt 0 ]]; then
+        not_found_in_normal=("${PARALLEL_LOOKUP_NOT_FOUND[@]}")
+        log "  ${#not_found_in_normal[@]} packages not found in standard repositories, will check restricted repositories"
+    fi
+
+    # Pass 2: Look up restricted packages + not-found deps from restricted+normal repositories
+    local pass2_packages=("${restricted_packages_to_lookup[@]}" "${not_found_in_normal[@]}")
+    if [[ ${#pass2_packages[@]} -gt 0 && ${#RESTRICTED_REPO_CONFIGS[@]} -gt 0 ]]; then
+        log "Pass 2: Resolving ${#pass2_packages[@]} packages from restricted+standard repositories..."
+
+        # Temporarily add restricted repos to REPOSITORIES
+        local saved_repos=("${REPOSITORIES[@]}")
+        REPOSITORIES+=("${RESTRICTED_REPO_CONFIGS[@]}")
+
+        local lookup_batch_size=$((PARALLEL_DOWNLOADS * LOOKUP_BATCH_SIZE))
+        local total_lookup_batches=$(( (${#pass2_packages[@]} + lookup_batch_size - 1) / lookup_batch_size ))
+
+        for ((i=0; i<${#pass2_packages[@]}; i+=lookup_batch_size)); do
+            local batch=("${pass2_packages[@]:i:lookup_batch_size}")
+            local batch_num=$((i/lookup_batch_size + 1))
+            local batch_start=$((i+1))
+            local batch_end=$((i + ${#batch[@]}))
+
+            log "  Processing lookup batch $batch_num/$total_lookup_batches: packages $batch_start-$batch_end of ${#pass2_packages[@]}"
+
+            parallel_package_lookups "$download_dir" "${batch[@]}"
             all_download_urls+=("${PARALLEL_LOOKUP_URLS[@]}")
 
             log "    Lookup batch $batch_num completed: found ${#PARALLEL_LOOKUP_URLS[@]} URLs to download"
         done
 
+        # Restore original repositories
+        REPOSITORIES=("${saved_repos[@]}")
+    fi
+
+    if [[ ${#all_download_urls[@]} -gt 0 ]]; then
         log "URL resolution completed: found ${#all_download_urls[@]} total files to download"
     else
         log "All packages already downloaded or no packages to lookup"
-        local all_download_urls=()
     fi
 
     # Download direct URLs first
