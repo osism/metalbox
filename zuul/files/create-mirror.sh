@@ -138,9 +138,9 @@ download_file() {
     local output="$2"
 
     if command -v wget >/dev/null 2>&1; then
-        wget -q -O "$output" "$url" 2>/dev/null
+        wget -q --timeout=30 --tries=2 -O "$output" "$url" 2>/dev/null
     elif command -v curl >/dev/null 2>&1; then
-        curl -s -o "$output" "$url" 2>/dev/null
+        curl -s --connect-timeout 15 --max-time 300 -o "$output" "$url" 2>/dev/null
     else
         return 1
     fi
@@ -579,6 +579,8 @@ find_package_info() {
     fi
 
     # Extract package info including version
+    # Use sort -V | tail -1 to pick only the latest version when multiple exist
+    # (e.g. flat repos like netdata may have multiple versions in one Packages file)
     local package_info=$(zcat "$cache_file" 2>/dev/null | awk -v pkg="$package_name" '
         BEGIN { RS="\n\n"; FS="\n" }
         $1 ~ "^Package: " pkg "$" {
@@ -596,7 +598,7 @@ find_package_info() {
                 print version "|" filename
             }
         }
-    ')
+    ' | sort -t'|' -k1,1V | tail -1)
 
     if [[ -n "$package_info" ]]; then
         local version=$(echo "$package_info" | cut -d'|' -f1)
