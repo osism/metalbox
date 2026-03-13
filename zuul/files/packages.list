@@ -27,6 +27,8 @@ busybox-static
 byobu
 bzip2
 ca-certificates
+ceph-common
+cephadm
 chrony
 cloud-guest-utils
 cloud-init
