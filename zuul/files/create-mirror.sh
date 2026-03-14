@@ -561,6 +561,7 @@ find_package_info() {
     local packages_url="$1"
     local package_name="$2"
     local base_url="$3"
+    local target_arch="${4:-amd64}"
 
     # Use cached file
     local cache_key=$(echo "$packages_url" | sed 's|[^a-zA-Z0-9]|_|g')
@@ -581,11 +582,13 @@ find_package_info() {
     # Extract package info including version
     # Use sort -V | tail -1 to pick only the latest version when multiple exist
     # (e.g. flat repos like netdata may have multiple versions in one Packages file)
-    local package_info=$(zcat "$cache_file" 2>/dev/null | awk -v pkg="$package_name" '
+    # Filter by architecture to avoid downloading wrong arch (e.g. armhf instead of amd64)
+    local package_info=$(zcat "$cache_file" 2>/dev/null | awk -v pkg="$package_name" -v arch="$target_arch" '
         BEGIN { RS="\n\n"; FS="\n" }
         $1 ~ "^Package: " pkg "$" {
             filename = ""
             version = ""
+            pkg_arch = ""
             for (i=1; i<=NF; i++) {
                 if ($i ~ /^Filename: /) {
                     filename = substr($i, 11)
@@ -593,8 +596,11 @@ find_package_info() {
                 if ($i ~ /^Version: /) {
                     version = substr($i, 10)
                 }
+                if ($i ~ /^Architecture: /) {
+                    pkg_arch = substr($i, 15)
+                }
             }
-            if (filename != "" && version != "") {
+            if (filename != "" && version != "" && (pkg_arch == arch || pkg_arch == "all")) {
                 print version "|" filename
             }
         }
@@ -657,11 +663,12 @@ find_latest_netbird_version() {
 
             if download_file "$packages_url" "$packages_file" >/dev/null 2>&1; then
                 # Extract all versions and find the latest
-                local package_infos=$(zcat "$packages_file" 2>/dev/null | awk -v pkg="$package_name" '
+                local package_infos=$(zcat "$packages_file" 2>/dev/null | awk -v pkg="$package_name" -v target_arch="$arch" '
                     BEGIN { RS="\n\n"; FS="\n" }
                     $1 ~ "^Package: " pkg "$" {
                         filename = ""
                         version = ""
+                        pkg_arch = ""
                         for (i=1; i<=NF; i++) {
                             if ($i ~ /^Filename: /) {
                                 filename = substr($i, 11)
@@ -669,8 +676,11 @@ find_latest_netbird_version() {
                             if ($i ~ /^Version: /) {
                                 version = substr($i, 10)
                             }
+                            if ($i ~ /^Architecture: /) {
+                                pkg_arch = substr($i, 15)
+                            }
                         }
-                        if (filename != "" && version != "") {
+                        if (filename != "" && version != "" && (pkg_arch == target_arch || pkg_arch == "all")) {
                             print version "|" filename
                         }
                     }
@@ -726,11 +736,12 @@ find_all_package_versions() {
 
             if download_file "$packages_url" "$packages_file" >/dev/null 2>&1; then
                 # Extract all versions of the package
-                local package_infos=$(zcat "$packages_file" 2>/dev/null | awk -v pkg="$package_name" '
+                local package_infos=$(zcat "$packages_file" 2>/dev/null | awk -v pkg="$package_name" -v target_arch="$arch" '
                     BEGIN { RS="\n\n"; FS="\n" }
                     $1 ~ "^Package: " pkg "$" {
                         filename = ""
                         version = ""
+                        pkg_arch = ""
                         for (i=1; i<=NF; i++) {
                             if ($i ~ /^Filename: /) {
                                 filename = substr($i, 11)
@@ -738,8 +749,11 @@ find_all_package_versions() {
                             if ($i ~ /^Version: /) {
                                 version = substr($i, 10)
                             }
+                            if ($i ~ /^Architecture: /) {
+                                pkg_arch = substr($i, 15)
+                            }
                         }
-                        if (filename != "" && version != "") {
+                        if (filename != "" && version != "" && (pkg_arch == target_arch || pkg_arch == "all")) {
                             print version "|" filename
                         }
                     }
@@ -806,7 +820,7 @@ find_best_package() {
         IFS=',' read -ra COMP_ARRAY <<< "$components"
         for component in "${COMP_ARRAY[@]}"; do
             local packages_url=$(build_packages_url "$base_url" "$dist" "$component" "$arch")
-            local package_info=$(find_package_info "$packages_url" "$package_name" "$base_url")
+            local package_info=$(find_package_info "$packages_url" "$package_name" "$base_url" "$arch")
 
             if [[ -n "$package_info" ]]; then
                 local version=$(echo "$package_info" | cut -d'|' -f1)
@@ -852,11 +866,13 @@ preload_packages_metadata() {
                 local cache_file="$PACKAGES_CACHE_DIR/${cache_key}.gz"
 
                 # Parse and cache all dependencies at once
-                zcat "$cache_file" 2>/dev/null | awk '
+                # Filter by architecture to avoid caching deps from wrong arch packages
+                zcat "$cache_file" 2>/dev/null | awk -v target_arch="$arch" '
                     BEGIN { RS="\n\n"; FS="\n" }
                     {
                         package = ""
                         depends = ""
+                        pkg_arch = ""
                         for (i=1; i<=NF; i++) {
                             if ($i ~ /^Package: /) {
                                 package = substr($i, 10)
@@ -868,8 +884,11 @@ preload_packages_metadata() {
                                 gsub(/\|[^,]*/, "", depends)
                                 gsub(/[ \t]+/, " ", depends)
                             }
+                            if ($i ~ /^Architecture: /) {
+                                pkg_arch = substr($i, 15)
+                            }
                         }
-                        if (package != "" && depends != "") {
+                        if (package != "" && depends != "" && (pkg_arch == target_arch || pkg_arch == "all")) {
                             print package ":" depends
                         }
                     }
