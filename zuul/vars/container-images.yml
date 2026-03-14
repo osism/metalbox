@@ -10,6 +10,7 @@ images:
   - library/redis:7.4.7-alpine
   - library/traefik:v3.4.1
   - pgautoupgrade/pgautoupgrade:16-alpine
+  - smallstep/step-ca:0.28.4
   - ubuntu/squid:6.1-23.10_beta
 
 images_manager:
