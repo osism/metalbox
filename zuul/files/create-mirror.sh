@@ -877,12 +877,19 @@ preload_packages_metadata() {
                             if ($i ~ /^Package: /) {
                                 package = substr($i, 10)
                             }
-                            if ($i ~ /^Depends: /) {
-                                depends = substr($i, 10)
+                            if ($i ~ /^(Pre-)?Depends: /) {
+                                # Extract value after "Depends: " or "Pre-Depends: "
+                                idx = index($i, ": ")
+                                val = substr($i, idx + 2)
                                 # Remove version constraints and alternatives
-                                gsub(/\([^)]*\)/, "", depends)
-                                gsub(/\|[^,]*/, "", depends)
-                                gsub(/[ \t]+/, " ", depends)
+                                gsub(/\([^)]*\)/, "", val)
+                                gsub(/\|[^,]*/, "", val)
+                                gsub(/[ \t]+/, " ", val)
+                                if (depends != "") {
+                                    depends = depends ", " val
+                                } else {
+                                    depends = val
+                                }
                             }
                             if ($i ~ /^Architecture: /) {
                                 pkg_arch = substr($i, 15)
@@ -912,14 +919,15 @@ resolve_dependencies_from_file() {
         BEGIN { RS="\n\n"; FS="\n" }
         $1 ~ "^Package: " pkg "$" {
             for (i=1; i<=NF; i++) {
-                if ($i ~ /^Depends: /) {
-                    depends = substr($i, 10)
+                if ($i ~ /^(Pre-)?Depends: /) {
+                    # Extract value after "Depends: " or "Pre-Depends: "
+                    idx = index($i, ": ")
+                    depends = substr($i, idx + 2)
                     # Remove version constraints and alternatives
                     gsub(/\([^)]*\)/, "", depends)
                     gsub(/\|[^,]*/, "", depends)
                     gsub(/[ \t]+/, " ", depends)
                     print depends
-                    break
                 }
             }
         }
