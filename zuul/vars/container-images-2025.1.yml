@@ -59,6 +59,7 @@ images_kolla:
   - ovn-controller:2025.1
   - ovn-nb-db-server:2025.1
   - ovn-northd:2025.1
+  - ovn-sb-db-relay:2025.1
   - ovn-sb-db-server:2025.1
   - placement-api:2025.1
   - prometheus-alertmanager:2025.1
