@@ -17,6 +17,7 @@ images_kolla:
   - designate-central:2024.2
   - designate-mdns:2024.2
   - designate-producer:2024.2
+  - designate-sink:2024.2
   - designate-worker:2024.2
   - fluentd:2024.2
   - glance-api:2024.2
