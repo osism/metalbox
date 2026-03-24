@@ -37,6 +37,7 @@ cloud-initramfs-dyn-netconf
 command-not-found
 console-setup
 console-setup-linux
+conntrack
 containerd.io
 containernetworking-plugins
 coreutils
