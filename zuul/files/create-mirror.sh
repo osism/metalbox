@@ -946,6 +946,7 @@ download_direct_urls() {
     # Direct URLs for packages that should be included without dependencies
     local direct_urls=(
         "http://ftp.de.debian.org/debian/pool/main/p/python-docker/python3-docker_7.1.0-2_all.deb"
+        "https://github.com/osism/ovn-network-agent/releases/download/v0.2.0/ovn-network-agent_0.2.0_amd64.deb"
     )
 
     if [[ ${#direct_urls[@]} -gt 0 ]]; then
