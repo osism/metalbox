@@ -426,6 +426,42 @@
                     label: "{{ item.item }}"
                   when: item.json.Oem.Cisco.VicPort | dict2items | selectattr('key', 'in', oem_config.Oem.Cisco.VicPort) | items2dict != oem_config.Oem.Cisco.VicPort
 
+            - name: Configure Cisco VIC UCSC-M-V5Q50GV2 vNICs
+              vars:
+                cisco_vics_vnics: "{{ cisco_vics_properties.results | map(attribute='json.Controllers') | flatten | map(attribute='Links.NetworkDeviceFunctions') | flatten | map('dict2items') | flatten | selectattr('key', 'equalto', '@odata.id') | map(attribute='value') }}"
+              when: cisco_vics_vnics | length > 0
+              block:  # noqa osism-fqcn
+                - name: Get NetworkDeviceFunction information
+                  delegate_to: localhost
+                  ansible.builtin.uri:
+                    url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ item }}"
+                    <<: *uri_opts
+                  register: cisco_vics_vnics_properties
+                  loop: "{{ cisco_vics_vnics }}"
+
+                - name: Configure NetworkDeviceFunction
+                  vars:
+                    oem_config:
+                      Oem:
+                        Cisco:
+                          VnicConfiguration:
+                            VlanMode: "Access"
+                  delegate_to: localhost
+                  ansible.builtin.uri:
+                    url: "{{ redfish_scheme }}://{{ inventory_hostname }}{{ item.item }}"
+                    method: PATCH
+                    body_format: json
+                    body: "{{ oem_config | to_json }}"
+                    status_code: 201
+                    <<: *uri_opts
+                  changed_when: true
+                  loop: "{{ cisco_vics_vnics_properties.results }}"
+                  loop_control:
+                    label: "{{ item.item }}"
+                  when:
+                    - item.json.Name.startswith('eth')
+                    - item.json.Oem.Cisco.VnicConfiguration | dict2items | selectattr('key', 'in', oem_config.Oem.Cisco.VnicConfiguration) | items2dict != oem_config.Oem.Cisco.VnicConfiguration
+
             - name: Wait for System 1 Storage to be available
               delegate_to: localhost
               register: storage
