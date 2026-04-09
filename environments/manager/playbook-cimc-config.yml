@@ -410,7 +410,7 @@
                         Cisco:
                           VicPort:
                             AdminFecMode: "Off"
-                            ConfiguredLinkSpeed: "Auto"
+                            ConfiguredLinkSpeedMbps: "Auto"
                     oem_config: "{{ oem_config_v1 if 'AdminLinkSpeed' in item.json.Oem.Cisco.VicPort else oem_config_v2 }}"
                   delegate_to: localhost
                   ansible.builtin.uri:
