@@ -206,6 +206,26 @@ as needed.
 3. Run `single-image-import.sh registry-delta-YYYYMMDD-HHMM.tar.gz` on the Metalbox node to import
    the image
 
+## Maintaining the container image mirror list
+
+The `images` and `images_manager` sections in `zuul/vars/container-images.yml`
+are generated from the [osism/release](https://github.com/osism/release) repository.
+The script computes the union of all image versions across a major release series
+so the mirror can serve sites on any minor release.
+
+```
+python3 scripts/generate_image_list.py
+```
+
+By default the script targets the latest major release. Use `--major N` to
+target a specific series, `--release-repo PATH` to use a local checkout
+instead of fetching from GitHub, and `--keep-latest` to preserve existing
+`:latest` tags instead of expanding them to pinned versions.
+
+Which images the Metalbox needs is defined in `scripts/metalbox-images.yml`.
+The script will error if new images appear upstream that are not listed
+in either the `images` or `exclude` section of that file.
+
 ## Troubleshooting
 
 ### Manual prepartion of the ironic volume

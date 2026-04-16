@@ -1,0 +1,58 @@
+---
+# Images from the osism/release repo that the Metalbox needs to mirror.
+# Use logical names matching keys in release/etc/images.yml.
+# Run scripts/generate_image_list.py to check for new or removed images
+# upstream -- the script will error if this list is out of date.
+images:
+  - ara_server
+  - dnsdist
+  - dnsmasq
+  - gnmic
+  - inventory_reconciler
+  - kolla_ansible
+  - mariadb
+  - netbox
+  - osism
+  - osism_ansible
+  - pgautoupgrade
+  - postgres
+  - redis
+  - squid
+  - stepca
+  - tempest
+  - traefik
+  - vault
+
+# Images in the release repo that the Metalbox does not need to mirror.
+# Listed here so the script knows they were evaluated, not overlooked.
+exclude:
+  - adminer
+  - alerta
+  - ceph_ansible
+  - cgit
+  - fleet
+  - homer
+  - memcached
+  - nexus
+  - nginx
+  - openstack_database_exporter
+  - opentelemetry_collector
+  - osism_kubernetes
+  - phpmyadmin
+  - pushgateway
+  - registry
+  - scaphandre
+  - sonic_vs
+  - substation
+  - syft
+
+# Images not tracked by the release repo's base.yml versioning.
+# Passed through to the output as-is.
+unmanaged:
+  - library/httpd:alpine
+
+unmanaged_manager:
+  - openstackclient:2024.2
+  - osism-frontend:latest
+  - rsync:latest
+  - seed:latest
