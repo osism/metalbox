@@ -1,5 +1,28 @@
 # metalbox
 
+## Release variants
+
+For the container registry two variants are available:
+
+* **2025.1** — a rolling build of the current `2025.1` release. The images
+  are rebuilt and republished regularly, so the tags inside
+  `registry-2025.1-full.tar.bz2` move forward over time.
+* **stable** — always points to the current stable OSISM release
+  (currently OSISM `10.0.0` on kolla `2025.1`; future releases such as
+  `10.1.0` will be published under the same `stable` name). The image
+  versions inside `registry-stable-full.tar.bz2` are pinned per release
+  and only change when a new stable OSISM release is published. Use this
+  variant if you want reproducible deployments and do not want to track
+  the rolling `2025.1` build.
+
+The following sections default to the `2025.1` artifacts. Replace the file
+name with the `stable` counterpart (e.g. `registry-stable-full.tar.bz2`
+instead of `registry-2025.1-full.tar.bz2`) to deploy the pinned variant.
+
+Note: Only the full container registry is provided as a `stable` variant.
+The non-full registry (`registry-2025.1.tar.bz2`) and the Octavia image
+(`octavia-export-2025.1.img`) are only published for `2025.1`.
+
 ## Preparation
 
 1. Download the Metalbox image [osism-metalbox-image.zip](https://nbg1.your-objectstorage.com/osism/openstack-ironic-images/osism-metalbox-image.zip).
@@ -28,6 +51,8 @@
 2. If the Metalbox is to be used as a container registry for nodes inside the Cloudpod
    download
    [registry-2025.1-full.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-2025.1-full.tar.bz2)
+   or, for the pinned variant,
+   [registry-stable-full.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-stable-full.tar.bz2)
 3. If the Metalbox is to be used as a file server for nodes inside the Cloudpod
    download
    [octavia-export-2025.1.img](https://nbg1.your-objectstorage.com/osism/metalbox/octavia-export-2025.1.img)
@@ -94,8 +119,10 @@
 
 #### Using Metalbox as a full container registry
 
-1. Download [registry-2025.1-full.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-2025.1-full.tar.bz2).
-2. Rename `registry-2025.1-full.tar.bz2` to `registry.tar.bz2`.
+1. Download [registry-2025.1-full.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-2025.1-full.tar.bz2)
+   or, to use the pinned variant,
+   [registry-stable-full.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-stable-full.tar.bz2).
+2. Rename the downloaded file to `registry.tar.bz2`.
 3. Copy `registry.tar.bz2` to `/home/dragon` on the Metalbox node.
 4. Run `SKIP_DOWNLOAD=true update-registry.sh` to update the container registry. Note that this can
    take a couple of minutes to finish.
