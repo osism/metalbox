@@ -27,10 +27,10 @@
    [ubuntu-noble.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/ubuntu-noble.tar.bz2)
 2. If the Metalbox is to be used as a container registry for nodes inside the Cloudpod
    download
-   [registry-2024.2-full.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-2024.2-full.tar.bz2)
+   [registry-2025.1-full.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-2025.1-full.tar.bz2)
 3. If the Metalbox is to be used as a file server for nodes inside the Cloudpod
    download
-   [octavia-export-2024.2.img](https://nbg1.your-objectstorage.com/osism/metalbox/octavia-export-2024.2.img)
+   [octavia-export-2025.1.img](https://nbg1.your-objectstorage.com/osism/metalbox/octavia-export-2025.1.img)
 
 ## Installation
 
@@ -94,8 +94,8 @@
 
 #### Using Metalbox as a full container registry
 
-1. Download [registry-2024.2-full.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-2024.2-full.tar.bz2).
-2. Rename `registry-2024.2-full.tar.bz2` to `registry.tar.bz2`.
+1. Download [registry-2025.1-full.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-2025.1-full.tar.bz2).
+2. Rename `registry-2025.1-full.tar.bz2` to `registry.tar.bz2`.
 3. Copy `registry.tar.bz2` to `/home/dragon` on the Metalbox node.
 4. Run `SKIP_DOWNLOAD=true update-registry.sh` to update the container registry. Note that this can
    take a couple of minutes to finish.
@@ -103,11 +103,11 @@
 #### Using Metalbox as a file server
 
 1. Download the Octavia image export
-   [octavia-export-2024.2.img](https://nbg1.your-objectstorage.com/osism/metalbox/octavia-export-2024.2.img).
-2. Copy `octavia-export-2024.2.img` to `/home/dragon` on the Metalbox node.
-3. Run `mount-images.sh` to mount the `octavia-export-2024.2.img` image.
+   [octavia-export-2025.1.img](https://nbg1.your-objectstorage.com/osism/metalbox/octavia-export-2025.1.img).
+2. Copy `octavia-export-2025.1.img` to `/home/dragon` on the Metalbox node.
+3. Run `mount-images.sh` to mount the `octavia-export-2025.1.img` image.
 4. Run `octavia-import.sh` to import the Octavia image files.
-5. Run `unmount-images.sh` to unmount the `octavia-export-2024.2.img` image.
+5. Run `unmount-images.sh` to unmount the `octavia-export-2025.1.img` image.
 
 ## Data updates
 
@@ -152,8 +152,8 @@ netbox-manager run --limit 300-node10
 
 #### Without external connectivity
 
-1. Download [registry-2024.2.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-2024.2.tar.bz2)
-2. Rename `registry-2024.2.tar.bz2` to `registry.tar.bz2`.
+1. Download [registry-2025.1.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-2025.1.tar.bz2)
+2. Rename `registry-2025.1.tar.bz2` to `registry.tar.bz2`.
 3. Copy `registry.tar.bz2` to `/home/dragon` on the Metalbox node
 4. Run `SKIP_DOWNLOAD=true update-registry.sh` to update the container registry
 
