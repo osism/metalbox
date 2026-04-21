@@ -52,7 +52,7 @@
     max: 1
 
 - semaphore:
-    name: semaphore-metalbox-mirror-container-images-2024.2-publish
+    name: semaphore-metalbox-mirror-container-images-publish
     max: 1
 
 - semaphore:
@@ -94,18 +94,18 @@
     files:
       - "^zuul/mirror-container-images.yml"
       - "^zuul/pre-mirror-container-images.yml"
-      - "^zuul/vars/container-images.yml"
-      - "^zuul/vars/container-images-2024.2.yml"
-      - "^zuul/vars/container-images-2025.1.yml"
-      - "^zuul/vars/container-images-stable.yml"
+      - "^zuul/vars/container-images-metalbox.yml"
+      - "^zuul/vars/container-images-manager-stable.yml"
+      - "^zuul/vars/container-images-openstack-2024.2.yml"
+      - "^zuul/vars/container-images-openstack-2025.1.yml"
+      - "^zuul/vars/container-images-openstack-stable.yml"
 
 - job:
-    name: metalbox-mirror-container-images-2024.2
+    name: metalbox-mirror-container-images-metalbox
     parent: metalbox-mirror-container-images
     timeout: 3600
     vars:
       full: false
-      openstack_version: "2024.2"
 
 - job:
     name: metalbox-mirror-container-images-2024.2-full
@@ -158,15 +158,14 @@
         pass-to-parent: true
 
 - job:
-    name: metalbox-mirror-container-images-2024.2-publish
+    name: metalbox-mirror-container-images-metalbox-publish
     parent: metalbox-mirror-container-images
     semaphores:
-      - name: semaphore-metalbox-mirror-container-images-2024.2-publish
+      - name: semaphore-metalbox-mirror-container-images-publish
     timeout: 3600
     vars:
       full: false
       publish: true
-      openstack_version: "2024.2"
     secrets:
       - name: secret
         secret: SECRET_METALBOX
@@ -234,7 +233,7 @@
     default-branch: main
     check:
       jobs:
-        - metalbox-mirror-container-images-2024.2
+        - metalbox-mirror-container-images-metalbox
         - metalbox-mirror-container-images-2024.2-full
         - metalbox-mirror-container-images-2025.1-full
         - metalbox-mirror-container-images-stable-full
@@ -248,14 +247,14 @@
     periodic-daily:
       jobs:
         - ansible-lint
-        - metalbox-mirror-container-images-2024.2-publish
+        - metalbox-mirror-container-images-metalbox-publish
         - metalbox-mirror-container-images-2024.2-full-publish
         - metalbox-mirror-container-images-2025.1-full-publish
         - metalbox-mirror-container-images-stable-full-publish
         - yamllint
     post:
       jobs:
-        - metalbox-mirror-container-images-2024.2-publish:
+        - metalbox-mirror-container-images-metalbox-publish:
             branches: main
         - metalbox-mirror-container-images-2024.2-full-publish:
             branches: main

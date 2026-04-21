@@ -1,5 +1,5 @@
 ---
-images:
+images_manager_external:
   - hashicorp/vault:1.19.5
   - library/httpd:alpine
   - library/mariadb:11.7.2

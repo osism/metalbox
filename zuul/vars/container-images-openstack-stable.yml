@@ -1,8 +1,4 @@
 ---
-images_osism:
-  - kolla-ansible:0.20260328.0
-  - openstackclient:8.3.0
-
 images_kolla:
   - release/2025.1/ceilometer-central:24.0.1.20260328
   - release/2025.1/ceilometer-compute:24.0.1.20260328
