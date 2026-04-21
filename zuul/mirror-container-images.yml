@@ -2,18 +2,28 @@
 - name: Mirror container images
   hosts: all
 
-  vars_files:
-    - "vars/container-images.yml"
-    - "vars/container-images-{{ _openstack_version }}.yml"
-
   vars:
     docker_registry: registry.osism.tech
 
     _publish: "{{ publish | default(False) }}"
     _full: "{{ full | default(False) }}"
-    _openstack_version: "{{ openstack_version| default('2024.2') }}"
+    _openstack_version: "{{ openstack_version | default('') }}"
+    _tarball_name: "{{ 'registry-' ~ _openstack_version ~ '-full.tar.bz2' if _full | bool else 'registry.tar.bz2' }}"
 
   tasks:
+    - name: Load metalbox image list
+      ansible.builtin.include_vars: vars/container-images-metalbox.yml
+
+    - name: Load openstack image list
+      ansible.builtin.include_vars: "vars/container-images-openstack-{{ _openstack_version }}.yml"
+      when: _full | bool
+
+    - name: Load manager-stable image list
+      ansible.builtin.include_vars: vars/container-images-manager-stable.yml
+      when:
+        - _full | bool
+        - _openstack_version == "stable"
+
     - name: Create registry volume
       community.docker.docker_volume:
         name: registry
@@ -28,10 +38,10 @@
         volumes:
           - registry:/var/lib/registry
 
-    - name: Copy images
+    - name: Copy manager external images
       ansible.builtin.command:
         cmd: "skopeo copy --retry-times 2 --dest-tls-verify=false docker://{{ docker_registry }}/dockerhub/{{ item }} docker://localhost:5000/{{ item }}"
-      loop: "{{ images }}"
+      loop: "{{ images_manager_external }}"
       changed_when: false
 
     - name: Copy manager images
@@ -43,8 +53,9 @@
     - name: Copy osism images
       ansible.builtin.command:
         cmd: "skopeo copy --retry-times 2 --dest-tls-verify=false docker://{{ docker_registry }}/osism/{{ item }} docker://localhost:5000/osism/{{ item }}"
-      loop: "{{ images_osism }}"
+      loop: "{{ images_osism | default([]) }}"
       changed_when: false
+      when: _full | bool
 
     - name: Copy kolla images
       ansible.builtin.command:
@@ -58,6 +69,24 @@
       loop: "{{ images_kolla }}"
       changed_when: false
       when: _full | bool
+
+    - name: Copy manager-stable external images
+      ansible.builtin.command:
+        cmd: "skopeo copy --retry-times 2 --dest-tls-verify=false docker://{{ docker_registry }}/dockerhub/{{ item }} docker://localhost:5000/{{ item }}"
+      loop: "{{ images_manager_stable_external }}"
+      changed_when: false
+      when:
+        - _full | bool
+        - _openstack_version == "stable"
+
+    - name: Copy manager-stable images
+      ansible.builtin.command:
+        cmd: "skopeo copy --retry-times 2 --dest-tls-verify=false docker://{{ docker_registry }}/osism/{{ item }} docker://localhost:5000/osism/{{ item }}"
+      loop: "{{ images_manager_stable }}"
+      changed_when: false
+      when:
+        - _full | bool
+        - _openstack_version == "stable"
 
     - name: Stop local container registry
       community.docker.docker_container:
@@ -79,12 +108,12 @@
     - name: Export registry volume
       community.docker.docker_container_exec:
         container: export
-        command: "sh -c 'cd /volume && tar cjf /export/registry-{{ _openstack_version }}.tar.bz2 .'"
+        command: "sh -c 'cd /volume && tar cjf /export/{{ _tarball_name }} .'"
       when: _publish | bool
 
     - name: Get size of export archive
       ansible.builtin.stat:
-        path: "registry-{{ _openstack_version }}.tar.bz2"
+        path: "{{ _tarball_name }}"
       register: result
       when: _publish | bool
 
@@ -103,13 +132,13 @@
         update_cache: true
       when: _publish | bool
 
-    - name: Run upload (metalbox)
+    - name: Run upload
       ansible.builtin.shell:  # noqa command-instead-of-module
         executable: /bin/bash
         cmd: |
-          sha256sum registry-{{ _openstack_version }}.tar.bz2 > registry-{{ _openstack_version }}.tar.bz2.CHECKSUM
-          rclone copyto registry-{{ _openstack_version }}.tar.bz2.CHECKSUM s3:osism/metalbox/registry-{{ _openstack_version }}.tar.bz2.CHECKSUM
-          rclone copyto registry-{{ _openstack_version }}.tar.bz2 s3:osism/metalbox/registry-{{ _openstack_version }}.tar.bz2
+          sha256sum {{ _tarball_name }} > {{ _tarball_name }}.CHECKSUM
+          rclone copyto {{ _tarball_name }}.CHECKSUM s3:osism/metalbox/{{ _tarball_name }}.CHECKSUM
+          rclone copyto {{ _tarball_name }} s3:osism/metalbox/{{ _tarball_name }}
       environment:
         RCLONE_CONFIG_S3_TYPE: s3
         RCLONE_CONFIG_S3_PROVIDER: Ceph
@@ -119,31 +148,6 @@
         RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "{{ secret.SECRET_KEY | trim }}"
         RCLONE_CONFIG_S3_ACL: public-read
         RCLONE_CONFIG_S3_NO_CHECK_BUCKET: "true"
-      when:
-        - not _full | bool
-        - _publish | bool
-      no_log: true
-      changed_when: true
-
-    - name: Run upload (full)
-      ansible.builtin.shell:  # noqa command-instead-of-module
-        executable: /bin/bash
-        cmd: |
-          mv registry-{{ _openstack_version }}.tar.bz2 registry-{{ _openstack_version }}-full.tar.bz2
-          sha256sum registry-{{ _openstack_version }}-full.tar.bz2 > registry-{{ _openstack_version }}-full.tar.bz2.CHECKSUM
-          rclone copyto registry-{{ _openstack_version }}-full.tar.bz2.CHECKSUM s3:osism/metalbox/registry-{{ _openstack_version }}-full.tar.bz2.CHECKSUM
-          rclone copyto registry-{{ _openstack_version }}-full.tar.bz2 s3:osism/metalbox/registry-{{ _openstack_version }}-full.tar.bz2
-      environment:
-        RCLONE_CONFIG_S3_TYPE: s3
-        RCLONE_CONFIG_S3_PROVIDER: Ceph
-        RCLONE_CONFIG_S3_ENDPOINT: https://nbg1.your-objectstorage.com
-        RCLONE_CONFIG_S3_REGION: nbg1
-        RCLONE_CONFIG_S3_ACCESS_KEY_ID: "{{ secret.ACCESS_KEY | trim }}"
-        RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "{{ secret.SECRET_KEY | trim }}"
-        RCLONE_CONFIG_S3_ACL: public-read
-        RCLONE_CONFIG_S3_NO_CHECK_BUCKET: "true"
-      when:
-        - _full | bool
-        - _publish | bool
+      when: _publish | bool
       no_log: true
       changed_when: true

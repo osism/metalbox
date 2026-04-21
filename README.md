@@ -20,8 +20,9 @@ name with the `stable` counterpart (e.g. `registry-stable-full.tar.bz2`
 instead of `registry-2025.1-full.tar.bz2`) to deploy the pinned variant.
 
 Note: Only the full container registry is provided as a `stable` variant.
-The non-full registry (`registry-2025.1.tar.bz2`) and the Octavia image
-(`octavia-export-2025.1.img`) are only published for `2025.1`.
+The non-full registry is published as a single version-independent
+`registry.tar.bz2`. The Octavia image (`octavia-export-2025.1.img`) is
+only published for `2025.1`.
 
 ## Preparation
 
@@ -179,10 +180,9 @@ netbox-manager run --limit 300-node10
 
 #### Without external connectivity
 
-1. Download [registry-2025.1.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry-2025.1.tar.bz2)
-2. Rename `registry-2025.1.tar.bz2` to `registry.tar.bz2`.
-3. Copy `registry.tar.bz2` to `/home/dragon` on the Metalbox node
-4. Run `SKIP_DOWNLOAD=true update-registry.sh` to update the container registry
+1. Download [registry.tar.bz2](https://nbg1.your-objectstorage.com/osism/metalbox/registry.tar.bz2)
+2. Copy `registry.tar.bz2` to `/home/dragon` on the Metalbox node
+3. Run `SKIP_DOWNLOAD=true update-registry.sh` to update the container registry
 
 #### With external connectivity
 
@@ -257,3 +257,27 @@ aria2c -x 4 -s 4 --auto-file-renaming=false https://nbg1.your-objectstorage.com/
 Replace the URL as needed for other files. The `-x 4 -s 4` flags use 4 connections
 for faster downloads, and `--auto-file-renaming=false` prevents duplicate files on
 resume.
+
+## Appendix: Container registry tarballs
+
+Four tarballs are published, all built from
+[`zuul/mirror-container-images.yml`](https://github.com/osism/metalbox/blob/main/zuul/mirror-container-images.yml)
+using the image lists under
+[`zuul/vars/`](https://github.com/osism/metalbox/tree/main/zuul/vars).
+
+- **`registry.tar.bz2`** — version-independent base tarball for the metalbox
+  itself. Built from
+  [`container-images-metalbox.yml`](https://github.com/osism/metalbox/blob/main/zuul/vars/container-images-metalbox.yml)
+  only.
+- **`registry-2024.2-full.tar.bz2`** — contents of `registry.tar.bz2` plus the
+  OpenStack image set from
+  [`container-images-openstack-2024.2.yml`](https://github.com/osism/metalbox/blob/main/zuul/vars/container-images-openstack-2024.2.yml).
+- **`registry-2025.1-full.tar.bz2`** — contents of `registry.tar.bz2` plus the
+  OpenStack image set from
+  [`container-images-openstack-2025.1.yml`](https://github.com/osism/metalbox/blob/main/zuul/vars/container-images-openstack-2025.1.yml).
+- **`registry-stable-full.tar.bz2`** — contents of `registry.tar.bz2` plus the
+  OpenStack image set from
+  [`container-images-openstack-stable.yml`](https://github.com/osism/metalbox/blob/main/zuul/vars/container-images-openstack-stable.yml)
+  and the manager image set from
+  [`container-images-manager-stable.yml`](https://github.com/osism/metalbox/blob/main/zuul/vars/container-images-manager-stable.yml),
+  pinned to the current OSISM stable release.

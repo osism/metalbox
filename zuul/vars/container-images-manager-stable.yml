@@ -1,0 +1,29 @@
+---
+images_manager_stable_external:
+  - hashicorp/vault:1.21.2
+  - library/httpd:alpine
+  - library/mariadb:11.8.4
+  - library/memcached:1.6.39-alpine
+  - library/postgres:16.11-alpine
+  - library/redis:7.4.7-alpine
+  - library/registry:3.0
+  - library/traefik:v3.5.0
+  - otel/opentelemetry-collector:0.146.1
+  - pgautoupgrade/pgautoupgrade:16-alpine
+  - smallstep/step-ca:0.29.0
+  - ubuntu/squid:6.1-23.10_beta
+
+images_manager_stable:
+  - ara-server:1.7.3
+  - dnsdist:1.9.8
+  - dnsmasq-osism:2.91
+  - gnmic:0.41.0
+  - inventory-reconciler:0.20260322.0
+  - kolla-ansible:0.20260328.0
+  - netbox:v4.3.5
+  - openstackclient:8.3.0
+  - osism-ansible:0.20260322.0
+  - osism-frontend:0.20260320.0
+  - osism:0.20260320.0
+  - rsync:latest
+  - tempest:latest
