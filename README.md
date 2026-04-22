@@ -235,6 +235,22 @@ as needed.
 
 ## Troubleshooting
 
+### Inspecting images on the local container registry
+
+If something does not work as expected with container images served from the
+local registry (e.g. a deployment pulls the wrong tag, an image is reported as
+missing, or after an `update-registry.sh` / `single-image-import.sh` run it is
+unclear whether a specific image actually ended up in the mirror), use
+`scripts/list-registry-images.sh` to enumerate what is currently stored on the
+local registry (`localhost:5001`):
+
+```
+./scripts/list-registry-images.sh          # list all repositories with their tags
+./scripts/list-registry-images.sh -t       # list only repository names
+./scripts/list-registry-images.sh -d       # list tags including the content digest
+./scripts/list-registry-images.sh -h       # show full help
+```
+
 ### Manual prepartion of the ironic volume
 
 ```
