@@ -274,7 +274,22 @@ Replace the URL as needed for other files. The `-x 4 -s 4` flags use 4 connectio
 for faster downloads, and `--auto-file-renaming=false` prevents duplicate files on
 resume.
 
-## Appendix: Container registry tarballs
+## Appendix
+
+### Writing the Metalbox image directly to disk without unpacking
+
+To avoid the intermediate `osism-metalbox-image.raw` file, `funzip` can stream
+the contents of `osism-metalbox-image.zip` straight to the target disk. Export
+the target device as an environment variable first so the command does not
+accidentally reference the wrong disk. Verify the target with `lsblk` before
+running the command — the write is destructive.
+
+```
+DEVICE=/dev/sda
+funzip osism-metalbox-image.zip | dd of=$DEVICE bs=4M status=progress
+```
+
+### Container registry tarballs
 
 Four tarballs are published, all built from
 [`zuul/mirror-container-images.yml`](https://github.com/osism/metalbox/blob/main/zuul/mirror-container-images.yml)
