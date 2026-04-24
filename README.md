@@ -297,3 +297,63 @@ using the image lists under
   and the manager image set from
   [`container-images-manager-stable.yml`](https://github.com/osism/metalbox/blob/main/zuul/vars/container-images-manager-stable.yml),
   pinned to the current OSISM stable release.
+
+## Usage
+
+### Software RAID
+
+Configuring a node with software RAID is done by setting an appropriate
+`target_raid_config` in the `ironic_parameters` custom field of the
+corresponding NetBox device.
+
+```
+---
+- device:
+    name: node101
+    [...]
+    custom_fields:
+      [...]
+      ironic_parameters:
+        [...]
+        target_raid_config:
+          logical_disks:
+            - size_gb: MAX
+              raid_level: "1"
+              is_root_volume: true
+              controller: software
+```
+
+Use `osism sync ironic node101` to synchronize the `target_raid_config` with
+the baremetal node. The RAID configuration wil be applied during node
+provisionig with `osism baremetal deploy node101`.
+The above example configuration will create a software RAID1 as root volume
+using the full size of all available disks. It is possible to restrict the used
+physical disks by specifying the `physical_disks` attribute with an array of
+restrictions as described in the [ironic documentation on "root device
+hints"](https://docs.openstack.org/ironic/latest/install/advanced.html#root-device-hints).
+For example use
+
+```
+---
+- device:
+    name: node101
+    [...]
+    custom_fields:
+      [...]
+      ironic_parameters:
+        [...]
+        target_raid_config:
+          logical_disks:
+            - size_gb: MAX
+              raid_level: "1"
+              is_root_volume: true
+              controller: software
+              physical_disks:
+                - size: "> 100"
+                - size: "> 100"
+```
+
+to restrict usage to two disks with a size greater than 100GiB.
+
+More examples and restrictions may be found in the [ironic raid
+documentation](https://docs.openstack.org/ironic/latest/admin/raid.html#).
