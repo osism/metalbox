@@ -364,11 +364,11 @@ For example use
               is_root_volume: true
               controller: software
               physical_disks:
-                - size: "> 100"
-                - size: "> 100"
+                - size: "<= 1000"
+                - size: "<= 1000"
 ```
 
-to restrict usage to two disks with a size greater than 100GiB.
+to restrict usage to two disks with a size smaller than or equal to 1000GiB.
 
 More examples and restrictions may be found in the [ironic raid
 documentation](https://docs.openstack.org/ironic/latest/admin/raid.html#).
