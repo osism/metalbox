@@ -368,7 +368,7 @@ For example use
                 - size: "<= 1000"
 ```
 
-to restrict usage to two disks with a size smaller than 1000GiB.
+to restrict usage to two disks with a size smaller than or equal to 1000GiB.
 
 More examples and restrictions may be found in the [ironic raid
 documentation](https://docs.openstack.org/ironic/latest/admin/raid.html#).
