@@ -41,6 +41,13 @@
       when: _publish | default(false) | bool
       changed_when: true
 
+    - name: Verify bzip2 archive integrity
+      ansible.builtin.command:
+        chdir: "{{ zuul.project.src_dir | default('.') }}"
+        cmd: bzip2 -t ubuntu-noble.tar.bz2
+      when: _publish | default(false) | bool
+      changed_when: false
+
 
     - name: Install rclone
       become: true
