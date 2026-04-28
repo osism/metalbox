@@ -111,6 +111,12 @@
         command: "sh -c 'cd /volume && tar cjf /export/{{ _tarball_name }} .'"
       when: _publish | bool
 
+    - name: Verify bzip2 archive integrity
+      ansible.builtin.command:
+        cmd: "bzip2 -t {{ _tarball_name }}"
+      when: _publish | bool
+      changed_when: false
+
     - name: Get size of export archive
       ansible.builtin.stat:
         path: "{{ _tarball_name }}"
