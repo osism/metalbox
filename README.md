@@ -383,6 +383,14 @@ to restrict usage to two disks with a size smaller than or equal to 1000GiB.
 More examples and restrictions may be found in the [ironic raid
 documentation](https://docs.openstack.org/ironic/latest/admin/raid.html#).
 
+A generic `target_raid_config` for all nodes may also be added to the
+`/opt/configuration/environments/manager/files/conductor.yml` on the Metalbox.
+This will however require a reconfiguration of the manager running on the
+Metalbox by executing `update-manager.sh`. The change will naturally need to be
+reapplied when the Metalbox image is replaced.
+Individual nodes with a differing `target_raid_config` may be overridden in the
+NetBox device's custom field `ironic_parameters` as described above.
+
 #### Configuring rebuild speed limits for nodes with software RAID
 
 To configure rebuild speed, `mdraid` provides the `speed_limit_min` and
