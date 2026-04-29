@@ -117,6 +117,25 @@
       when: _publish | bool
       changed_when: false
 
+    - name: Generate SHA256 checksum
+      ansible.builtin.command:
+        cmd: "sha256sum {{ _tarball_name }}"
+      register: _sha256_result
+      when: _publish | bool
+      changed_when: false
+
+    - name: Write SHA256 checksum file
+      ansible.builtin.copy:
+        content: "{{ _sha256_result.stdout }}\n"
+        dest: "{{ _tarball_name }}.CHECKSUM"
+        mode: "0644"
+      when: _publish | bool
+
+    - name: Print SHA256 checksum
+      ansible.builtin.debug:
+        msg: "{{ _sha256_result.stdout }}"
+      when: _publish | bool
+
     - name: Get size of export archive
       ansible.builtin.stat:
         path: "{{ _tarball_name }}"
@@ -142,7 +161,6 @@
       ansible.builtin.shell:  # noqa command-instead-of-module
         executable: /bin/bash
         cmd: |
-          sha256sum {{ _tarball_name }} > {{ _tarball_name }}.CHECKSUM
           rclone copyto {{ _tarball_name }}.CHECKSUM s3:osism/metalbox/{{ _tarball_name }}.CHECKSUM
           rclone copyto {{ _tarball_name }} s3:osism/metalbox/{{ _tarball_name }}
       environment:

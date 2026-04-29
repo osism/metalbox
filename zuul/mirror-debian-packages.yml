@@ -37,7 +37,6 @@
           version=$(date +%Y%m%d)
           docker tag "quay.io/osism-mirror/ubuntu-noble:$version" registry.osism.tech/osism/packages/ubuntu-noble:latest
           docker save registry.osism.tech/osism/packages/ubuntu-noble:latest | bzip2 > ubuntu-noble.tar.bz2
-          sha256sum ubuntu-noble.tar.bz2 > ubuntu-noble.tar.bz2.CHECKSUM
       when: _publish | default(false) | bool
       changed_when: true
 
@@ -48,6 +47,25 @@
       when: _publish | default(false) | bool
       changed_when: false
 
+    - name: Generate SHA256 checksum
+      ansible.builtin.command:
+        chdir: "{{ zuul.project.src_dir | default('.') }}"
+        cmd: sha256sum ubuntu-noble.tar.bz2
+      register: _sha256_result
+      when: _publish | default(false) | bool
+      changed_when: false
+
+    - name: Write SHA256 checksum file
+      ansible.builtin.copy:
+        content: "{{ _sha256_result.stdout }}\n"
+        dest: "{{ zuul.project.src_dir | default('.') }}/ubuntu-noble.tar.bz2.CHECKSUM"
+        mode: "0644"
+      when: _publish | default(false) | bool
+
+    - name: Print SHA256 checksum
+      ansible.builtin.debug:
+        msg: "{{ _sha256_result.stdout }}"
+      when: _publish | default(false) | bool
 
     - name: Install rclone
       become: true
