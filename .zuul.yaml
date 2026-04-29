@@ -103,14 +103,14 @@
 - job:
     name: metalbox-mirror-container-images-metalbox
     parent: metalbox-mirror-container-images
-    timeout: 3600
+    timeout: 7200
     vars:
       full: false
 
 - job:
     name: metalbox-mirror-container-images-2024.2-full
     parent: metalbox-mirror-container-images
-    timeout: 3600
+    timeout: 7200
     vars:
       full: true
       openstack_version: "2024.2"
@@ -118,7 +118,7 @@
 - job:
     name: metalbox-mirror-container-images-2025.1-full
     parent: metalbox-mirror-container-images
-    timeout: 3600
+    timeout: 7200
     vars:
       full: true
       openstack_version: "2025.1"
@@ -126,7 +126,7 @@
 - job:
     name: metalbox-mirror-container-images-stable-full
     parent: metalbox-mirror-container-images
-    timeout: 3600
+    timeout: 7200
     vars:
       full: true
       openstack_version: "stable"
@@ -162,7 +162,7 @@
     parent: metalbox-mirror-container-images
     semaphores:
       - name: semaphore-metalbox-mirror-container-images-publish
-    timeout: 3600
+    timeout: 7200
     vars:
       full: false
       publish: true
@@ -176,7 +176,7 @@
     parent: metalbox-mirror-container-images
     semaphores:
       - name: semaphore-metalbox-mirror-container-images-2024.2-full-publish
-    timeout: 3600
+    timeout: 7200
     vars:
       full: true
       publish: true
@@ -191,7 +191,7 @@
     parent: metalbox-mirror-container-images
     semaphores:
       - name: semaphore-metalbox-mirror-container-images-2025.1-full-publish
-    timeout: 3600
+    timeout: 7200
     vars:
       full: true
       publish: true
@@ -206,7 +206,7 @@
     parent: metalbox-mirror-container-images
     semaphores:
       - name: semaphore-metalbox-mirror-container-images-stable-full-publish
-    timeout: 3600
+    timeout: 7200
     vars:
       full: true
       publish: true
