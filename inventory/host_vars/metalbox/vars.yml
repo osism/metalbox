@@ -1,2 +1,5 @@
 ---
 ansible_host: 192.168.42.10
+network_dispatcher_scripts:
+  - src: "/opt/configuration/network/iptables.sh"
+    dest: routable.d/iptables.sh
