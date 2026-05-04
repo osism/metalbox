@@ -322,7 +322,7 @@ def write_network_dispatcher_script(primary_ip4, interface):
         "\n"
         f'if [[ $IFACE == "{interface.lower()}" ]]; then\n'
         f"    iptables -t nat -I POSTROUTING 1 -s {DEFAULTS['MASQUERADING_SOURCE']} -d {DEFAULTS['MASQUERADING_DESTINATION']} -j SNAT --to-source {primary_ip4.address.split('/')[0]}\n"
-        "fi"
+        "fi\n"
     )
     try:
         # Create directory if it doesn't exist
