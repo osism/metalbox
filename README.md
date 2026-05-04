@@ -66,6 +66,16 @@ only published for `2025.1`.
    the first disk. Note that the exact names of the disks may vary depending on your server
    type, use `lsblk` to verify. Afterwards power off the node, remove all virtual media devices and
    power on the node again.
+
+   **Note:** The initial boot can take some time as the local container registry
+   is created on first boot. The boot is finished once the `registry` container is
+   up and running. Verify with `docker ps`:
+
+   ```
+   dragon@metalbox:~$ docker ps
+   CONTAINER ID   IMAGE        COMMAND                  CREATED          STATUS          PORTS                    NAMES
+   2ff7d1d57b06   registry:3   "/entrypoint.sh /etc…"   44 seconds ago   Up 43 seconds   0.0.0.0:5001->5000/tcp   registry
+   ```
 4. Import of the NetBox files.
    * Use the `netbox-export.img` file as virtual media (vHDD) and run `netbox-import.sh`
      to import the NetBox files. Afterwards remove the virtual media (vHDD).
