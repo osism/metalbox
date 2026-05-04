@@ -14,6 +14,11 @@ import yaml
 from pathlib import Path
 from pynetbox import api
 
+DEFAULTS = dict(
+    MASQUERADING_SOURCE="172.31.100.0/23",
+    MASQUERADING_DESTINATION="0.0.0.0/0",
+)
+
 
 def literal_str_representer(dumper, data):
     """
@@ -141,7 +146,7 @@ def fetch_device_config(nb, device_name):
         device_name: Name of the device to query
 
     Returns:
-        tuple: (local_context_data dict, site object or None, custom_fields dict)
+        tuple: (local_context_data dict, site object or None, custom_fields dict, primary_ip4 object or None)
     """
     try:
         device = nb.dcim.devices.get(name=device_name)
@@ -178,7 +183,14 @@ def fetch_device_config(nb, device_name):
                 file=sys.stderr,
             )
 
-        return local_context_data, site, custom_fields
+        # Extract primary_ip4 if available
+        primary_ip4 = (
+            device.primary_ip4
+            if hasattr(device, "primary_ip4") and device.primary_ip4
+            else None
+        )
+
+        return local_context_data, site, custom_fields, primary_ip4
 
     except Exception as e:
         print(
@@ -236,6 +248,35 @@ def extract_config_values(local_context_data, custom_fields):
     return config
 
 
+def fetch_interface_by_address(nb, address):
+    """
+    Fetch device configuration and site information from Netbox.
+
+    Args:
+        nb: Netbox API client
+        address: IP address to query
+
+    Returns:
+        str: Name of interface IP is assigned to
+    """
+    try:
+        ip = nb.ipam.ip_addresses.get(address=address)
+
+        if not ip:
+            print(f"Error: IP address {address} not found in Netbox", file=sys.stderr)
+            sys.exit(1)
+
+        if ip.assigned_object:
+            return ip.assigned_object.name
+        else:
+            return None
+
+    except Exception as e:
+        print("Error: Failed to fetch interface from Netbox", file=sys.stderr)
+        print(f"Details: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 def write_group_vars(config):
     """
     Write configuration to Ansible group_vars YAML file.
@@ -258,6 +299,43 @@ def write_group_vars(config):
 
     except Exception as e:
         print(f"Error: Failed to write configuration file", file=sys.stderr)
+        print(f"Details: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def write_network_dispatcher_script(primary_ip4, interface):
+    output_dir = Path("/opt/configuration/network")
+    output_file = output_dir / "iptables.sh"
+    if not primary_ip4:
+        print("Error: Could not find primary IPv4", file=sys.stderr)
+        sys.exit(1)
+
+    if not interface:
+        print(
+            f"Error: Could not find interface for primary IPv4 {primary_ip4}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    script = (
+        "#!/usr/bin/env bash\n"
+        "\n"
+        f'if [[ $IFACE == "{interface.lower()}" ]]; then\n'
+        f"    iptables -t nat -I POSTROUTING 1 -s {DEFAULTS['MASQUERADING_SOURCE']} -d {DEFAULTS['MASQUERADING_DESTINATION']} -j SNAT --to-source {primary_ip4.address.split('/')[0]}\n"
+        "fi"
+    )
+    try:
+        # Create directory if it doesn't exist
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Write network dispatcher script
+        with open(output_file, "w") as f:
+            f.write(script)
+
+        print(f"Successfully wrote network dispatcher script to {output_file}")
+
+    except Exception as e:
+        print("Error: Failed to write network dispatcher script", file=sys.stderr)
         print(f"Details: {e}", file=sys.stderr)
         sys.exit(1)
 
@@ -287,7 +365,9 @@ def main():
 
     # Fetch device configuration and site information
     print(f"Fetching configuration for device '{device_name}'...")
-    local_context_data, site, custom_fields = fetch_device_config(nb, device_name)
+    local_context_data, site, custom_fields, primary_ip4 = fetch_device_config(
+        nb, device_name
+    )
 
     # Set the managed Netbox site if available
     if site:
@@ -322,6 +402,10 @@ def main():
 
     # Write to group_vars
     write_group_vars(config)
+
+    # Write network dispatcher script
+    interface = fetch_interface_by_address(nb, primary_ip4)
+    write_network_dispatcher_script(primary_ip4, interface)
 
     print("Configuration fetch complete!")
 
