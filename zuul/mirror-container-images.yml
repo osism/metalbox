@@ -40,7 +40,7 @@
 
     - name: Copy manager external images
       ansible.builtin.command:
-        cmd: "skopeo copy --retry-times 2 --dest-tls-verify=false docker://{{ docker_registry }}/dockerhub/{{ item }} docker://localhost:5000/{{ item }}"
+        cmd: "skopeo copy --retry-times 2 --dest-tls-verify=false docker://index.docker.io/{{ item }} docker://localhost:5000/{{ item }}"
       loop: "{{ images_manager_external }}"
       changed_when: false
 
@@ -72,7 +72,7 @@
 
     - name: Copy manager-stable external images
       ansible.builtin.command:
-        cmd: "skopeo copy --retry-times 2 --dest-tls-verify=false docker://{{ docker_registry }}/dockerhub/{{ item }} docker://localhost:5000/{{ item }}"
+        cmd: "skopeo copy --retry-times 2 --dest-tls-verify=false docker://index.docker.io/{{ item }} docker://localhost:5000/{{ item }}"
       loop: "{{ images_manager_stable_external }}"
       changed_when: false
       when:
