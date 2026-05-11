@@ -8,6 +8,7 @@ CONTAINER_REGISTRY="${CONTAINER_REGISTRY:-localhost:5001}"
 REPOSITORY_IMAGE="${REPOSITORY_IMAGE:-osism/packages/ubuntu-noble}"
 SKIP_DOWNLOAD="${SKIP_DOWNLOAD:-false}"
 SKIP_PUSH="${SKIP_PUSH:-true}"
+SKIP_SYNC="${SKIP_SYNC:-false}"
 DATA_DIRECTORY="${DATA_DIRECTORY:-/opt/httpd/data}"
 
 set -e
@@ -71,11 +72,31 @@ echo "Image available at: $TARGET_IMAGE"
 # Sync repository data from the container image to the httpd data directory.
 # This replicates what the Ansible httpd role does via the httpd-data container:
 # the rsync base image's CMD is "rsync -avz /data/ /export/root/"
-echo "Syncing repository data to $DATA_DIRECTORY/root/ubuntu-noble..."
-sudo mkdir -p "$DATA_DIRECTORY/root"
-docker run --rm \
-    -e USER_ID="$(stat -c %u "$DATA_DIRECTORY")" \
-    -e GROUP_ID="$(stat -c %g "$DATA_DIRECTORY")" \
-    -v "$DATA_DIRECTORY:/export" \
-    "$TARGET_IMAGE"
-echo "Repository data sync completed successfully!"
+if [ "$SKIP_SYNC" = "true" ]; then
+    echo "SKIP_SYNC is set to true, skipping repository data sync..."
+    exit 0
+fi
+
+if [ ! -d "/opt/httpd/data/root" ]; then
+    if grep -qE "^httpd_data_enable:[[:space:]]*false[[:space:]]*$" /opt/configuration/environments/infrastructure/configuration.yml 2>/dev/null; then
+        echo "Creating /opt/httpd/data/root (httpd_data_enable: false)..."
+        sudo mkdir -p /opt/httpd/data/root
+        sudo chown dragon:dragon /opt/httpd /opt/httpd/data /opt/httpd/data/root
+        sudo chmod 0750 /opt/httpd
+        sudo chmod 0755 /opt/httpd/data
+        sudo chmod 0755 /opt/httpd/data/root
+    fi
+fi
+
+if [ -d "/opt/httpd/data/root" ]; then
+    echo "Syncing repository data to $DATA_DIRECTORY/root/ubuntu-noble..."
+    docker run --rm \
+        -e USER_ID="$(stat -c %u "$DATA_DIRECTORY")" \
+        -e GROUP_ID="$(stat -c %g "$DATA_DIRECTORY")" \
+        -v "$DATA_DIRECTORY:/export" \
+        "$TARGET_IMAGE"
+    echo "Repository data sync completed successfully!"
+else
+    echo "Skipping repository data sync: /opt/httpd/data/root does not exist."
+    echo "Note: On initial Metalbox deployment, the initial import runs automatically afterwards."
+fi
