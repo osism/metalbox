@@ -15,7 +15,7 @@ OCTAVIA_EXPORT_SIZE="${OCTAVIA_EXPORT_SIZE:-1G}"
 # Check if version parameter is provided
 if [[ -z "$1" ]]; then
     echo -e "${RED}Error: OpenStack version parameter required${NC}"
-    echo -e "Usage: $0 <version> (e.g., $0 2024.2)"
+    echo -e "Usage: $0 <version> (e.g., $0 2025.1)"
     exit 1
 fi
 
