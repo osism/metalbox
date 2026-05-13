@@ -10,7 +10,7 @@ NC='\033[0m' # No Color
 
 # Default patterns or use environment variables
 OCTAVIA_METADATA_PATTERN="${OCTAVIA_METADATA_PATTERN:-last-*}"
-OCTAVIA_IMAGE_PATTERN="${OCTAVIA_IMAGE_PATTERN:-octavia-amphora-haproxy-*.qcow2}"
+OCTAVIA_IMAGE_PATTERN="${OCTAVIA_IMAGE_PATTERN:-octavia-amphora-haproxy-*.qcow2*}"
 # Default destination directory or use environment variable
 OCTAVIA_DEST_DIR="${OCTAVIA_DEST_DIR:-/opt/httpd/data/root/octavia}"
 
