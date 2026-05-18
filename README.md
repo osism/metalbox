@@ -349,8 +349,8 @@ corresponding NetBox device.
 ```
 
 Use `osism sync ironic node101` to synchronize the `target_raid_config` with
-the baremetal node. The RAID configuration wil be applied during node
-provisionig with `osism baremetal deploy node101`.
+the baremetal node. The RAID configuration will be applied during node
+provisioning with `osism baremetal deploy node101`.
 The above example configuration will create a software RAID1 as root volume
 using the full size of all available disks. It is possible to restrict the used
 physical disks by specifying the `physical_disks` attribute with an array of
