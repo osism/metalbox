@@ -382,3 +382,28 @@ to restrict usage to two disks with a size smaller than or equal to 1000GiB.
 
 More examples and restrictions may be found in the [ironic raid
 documentation](https://docs.openstack.org/ironic/latest/admin/raid.html#).
+
+#### Configuring rebuild speed limits for nodes with software RAID
+
+To configure rebuild speed, `mdraid` provides the `speed_limit_min` and
+`speed_limit_max` sysctl parameters. These may be used to configure a target
+rebuild speed minimum for when there is no-rebuild activity on an array and a
+maximum for when there is no other activity. The given values are interpreted
+as Kibibytes per second.
+One may use [the `sysctl` role supplied with
+OSISM](https://osism.tech/docs/guides/configuration-guide/commons/sysctl) to
+modify these parameters.
+For example to set a minimum target speed of `5000KiB/s` and a maximum target
+speed of `500000KiB/s` on all nodes in the compute group add the following to
+`environments/generic/configuration.yml`.
+
+```
+sysctl_extra:
+  compute:
+    - name: dev.raid.speed_limit_min
+      value: 5000
+    - name: dev.raid.speed_limit_max
+      value: 500000
+```
+
+The `sysctl` values are then applied by running `osism apply sysctl`.
