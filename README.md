@@ -1,5 +1,15 @@
 # metalbox
 
+## Deployment scenario
+
+This guide describes installing the Metalbox on a physical server by using
+the preconfigured machine image provided by OSISM. After performing the
+initial downloads, the complete installation can then be executed in an
+airgapped environment without any access to external sources. If you
+instead want to deploy the Metalbox service on an
+existing machine - which can be either a physical server or a VM -
+please have a look at [INSTALL-VM.md].
+
 ## Release variants
 
 For the container registry two variants are available:
