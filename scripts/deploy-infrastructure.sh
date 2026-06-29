@@ -18,8 +18,11 @@ else
     echo "httpd container is already running"
 fi
 
+source /opt/configuration/scripts/include.sh
+key_value_store=$(valkey_or_redis)
+
 osism apply common
-osism apply redis
+osism apply "$key_value_store"
 osism apply memcached
 osism apply rabbitmq
 osism apply mariadb
