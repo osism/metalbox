@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+source /opt/configuration/scripts/include.sh
+
 MANAGED_SITE="$1"
 ENABLE_SONIC="${ENABLE_SONIC:-true}"
 
@@ -29,8 +31,9 @@ osism sync inventory
 osism apply hosts
 osism apply network
 osism apply facts
+key_value_store=$(valkey_or_redis)
 osism apply common
-osism apply redis
+osism apply "$key_value_store"
 osism apply memcached
 osism apply rabbitmq
 osism apply mariadb
