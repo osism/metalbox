@@ -573,7 +573,7 @@ parallel_package_lookups() {
     printf '%s\n' "${packages[@]}" > "$package_list"
 
     # Export functions and variables needed by subprocesses
-    export -f parallel_package_lookup find_best_package find_package_info find_all_package_versions find_latest_netbird_version version_compare download_file cache_packages_file build_packages_url record_package_checksum
+    export -f parallel_package_lookup find_best_package find_package_info find_all_package_versions find_latest_netbird_version version_compare download_file cache_packages_file build_packages_url record_package_checksum report_index_fetch_failure
     export TEMP_DIR PACKAGES_CACHE_DIR PACKAGES_CHECKSUM_FILE
 
     # Use xargs for package lookups (GNU parallel disabled due to argument parsing issues)
@@ -629,6 +629,30 @@ parallel_package_lookups() {
     return 0
 }
 
+# Report an unreachable package index, once per index.
+#
+# Without this a repository that throttles or drops connections is entirely
+# silent: cache_packages_file() just returns non-zero, find_best_package()
+# finds no candidate, and every package that repository should have provided
+# is reported as "not found in any repository" -- which reads as "this package
+# does not exist" rather than "the mirror stopped answering".
+#
+# The message goes to stderr on purpose. This runs inside find_package_info(),
+# whose stdout is captured by its caller, so anything written to stdout here
+# would be parsed as a package URL.
+report_index_fetch_failure() {
+    local packages_url="$1"
+    local cache_key="$2"
+    local marker="$PACKAGES_CACHE_DIR/.fetch-failed-${cache_key}"
+
+    # Lookups run in parallel worker processes. mkdir is atomic, so exactly one
+    # worker reports each index instead of one message per package.
+    if mkdir "$marker" 2>/dev/null; then
+        echo "WARNING: could not fetch package index: $packages_url" >&2
+        echo "         packages provided only by this repository will be reported as not found" >&2
+    fi
+}
+
 # Download and cache Packages.gz file
 cache_packages_file() {
     local packages_url="$1"
@@ -665,6 +689,7 @@ cache_packages_file() {
             fi
         fi
         rm -f "$plain_file" "$cache_file"
+        report_index_fetch_failure "$packages_url" "$cache_key"
         return 1
     fi
     return 0
