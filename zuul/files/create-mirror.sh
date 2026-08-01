@@ -1070,7 +1070,16 @@ download_direct_urls() {
 
     if [[ ${#direct_urls[@]} -gt 0 ]]; then
         log "Downloading ${#direct_urls[@]} direct URLs..."
-        parallel_download_files "$download_dir" "${direct_urls[@]}"
+
+        # parallel_download_files returns the number of files still missing.
+        # Left as the function's exit status it would abort the whole script
+        # through set -e, with that count as the exit code and nothing logged.
+        local direct_failed=0
+        parallel_download_files "$download_dir" "${direct_urls[@]}" || direct_failed=$?
+
+        if [[ $direct_failed -gt 0 ]]; then
+            error "$direct_failed of ${#direct_urls[@]} direct URLs could not be downloaded"
+        fi
     fi
 }
 
