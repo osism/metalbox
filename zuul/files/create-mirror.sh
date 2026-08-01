@@ -1203,7 +1203,7 @@ download_packages() {
 
         # Remove duplicates
         if [[ ${#packages_to_download[@]} -gt 0 ]]; then
-            IFS=$'\n' packages_to_download=($(printf '%s\n' "${packages_to_download[@]}" | sort -u))
+            mapfile -t packages_to_download < <(printf '%s\n' "${packages_to_download[@]}" | sort -u)
             log "    Found ${#packages_to_download[@]} new dependencies to resolve"
         fi
     done
