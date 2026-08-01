@@ -41,7 +41,6 @@ PACKAGES_CACHE_DIR="$TEMP_DIR/packages_cache"
 # "filename<TAB>sha256<TAB>size" records. Written while resolving package URLs
 # and consulted after each download.
 PACKAGES_CHECKSUM_FILE="$TEMP_DIR/expected_checksums.tsv"
-declare -A PACKAGES_METADATA_CACHE
 
 # Colors for output
 RED='\033[0;31m'
@@ -576,7 +575,6 @@ parallel_package_lookups() {
     # Export functions and variables needed by subprocesses
     export -f parallel_package_lookup find_best_package find_package_info find_all_package_versions find_latest_netbird_version version_compare download_file cache_packages_file build_packages_url record_package_checksum
     export TEMP_DIR PACKAGES_CACHE_DIR PACKAGES_CHECKSUM_FILE
-    export -A PACKAGES_METADATA_CACHE
 
     # Use xargs for package lookups (GNU parallel disabled due to argument parsing issues)
     cat "$package_list" | xargs -P "$PARALLEL_DOWNLOADS" -I {} bash -c "
@@ -687,14 +685,6 @@ find_package_info() {
         return 1
     fi
 
-    # Check metadata cache first (use safe key format)
-    local safe_package_name=$(echo "$package_name" | sed 's|[^a-zA-Z0-9]|_|g')
-    local cache_lookup_key="${cache_key}_${safe_package_name}"
-    if [[ -n "${PACKAGES_METADATA_CACHE[$cache_lookup_key]}" ]]; then
-        echo "${PACKAGES_METADATA_CACHE[$cache_lookup_key]}"
-        return 0
-    fi
-
     # Extract package info including version
     # Use sort -V | tail -1 to pick only the latest version when multiple exist
     # (e.g. flat repos like netdata may have multiple versions in one Packages file)
@@ -738,8 +728,6 @@ find_package_info() {
             "$(echo "$package_info" | cut -d'|' -f4)"
         local result="$version|$base_url/$filename"
 
-        # Cache the result
-        PACKAGES_METADATA_CACHE[$cache_lookup_key]="$result"
         echo "$result"
     fi
 }
