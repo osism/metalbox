@@ -994,103 +994,79 @@ find_best_package() {
     fi
 }
 
-# Preload all package metadata for fast dependency resolution
-preload_packages_metadata() {
-    local repo_configs=("$@")
-    declare -gA ALL_PACKAGES_DEPS
+# Build a package -> dependencies map from the downloaded repository indexes.
+#
+# One pass per index file. Dependency names are cleaned up inside awk (version
+# constraints, alternatives, multiarch qualifiers) so that resolving a package
+# afterwards is a plain associative-array lookup instead of another pass over
+# the indexes.
+#
+# The results are accumulated in ALL_PACKAGES_DEPS. A package present in more
+# than one index (a base package that also has an update, say) contributes the
+# union of its dependencies, which is what the previous per-file scan produced.
+build_dependency_map() {
+    local packages_files=("$@")
+    declare -gA ALL_PACKAGES_DEPS=()
 
-    log "Preloading package metadata for fast dependency resolution..."
+    log "Indexing dependencies from ${#packages_files[@]} package metadata files..."
 
-    for repo_config in "${repo_configs[@]}"; do
-        IFS=':' read -r host path dist components arch <<< "$repo_config"
-        local base_url="http://$host$path"
-
-        IFS=',' read -ra COMP_ARRAY <<< "$components"
-        for component in "${COMP_ARRAY[@]}"; do
-            local packages_url=$(build_packages_url "$base_url" "$dist" "$component" "$arch")
-            local cache_key=$(echo "$packages_url" | sed 's|[^a-zA-Z0-9]|_|g')
-
-            if cache_packages_file "$packages_url"; then
-                local cache_file="$PACKAGES_CACHE_DIR/${cache_key}.gz"
-
-                # Parse and cache all dependencies at once
-                # Filter by architecture to avoid caching deps from wrong arch packages
-                zcat "$cache_file" 2>/dev/null | awk -v target_arch="$arch" '
-                    BEGIN { RS="\n\n"; FS="\n" }
-                    {
-                        package = ""
-                        depends = ""
-                        pkg_arch = ""
-                        for (i=1; i<=NF; i++) {
-                            if ($i ~ /^Package: /) {
-                                package = substr($i, 10)
-                            }
-                            if ($i ~ /^(Pre-)?Depends: /) {
-                                # Extract value after "Depends: " or "Pre-Depends: "
-                                idx = index($i, ": ")
-                                val = substr($i, idx + 2)
-                                # Remove version constraints and alternatives
-                                gsub(/\([^)]*\)/, "", val)
-                                gsub(/\|[^,]*/, "", val)
-                                gsub(/[ \t]+/, " ", val)
-                                if (depends != "") {
-                                    depends = depends ", " val
-                                } else {
-                                    depends = val
-                                }
-                            }
-                            if ($i ~ /^Architecture: /) {
-                                pkg_arch = substr($i, 15)
-                            }
-                        }
-                        if (package != "" && depends != "" && (pkg_arch == target_arch || pkg_arch == "all")) {
-                            print package ":" depends
-                        }
-                    }
-                ' | while IFS=: read -r pkg deps; do
-                    local safe_pkg=$(echo "$pkg" | sed 's|[^a-zA-Z0-9._-]|_|g')
-                    ALL_PACKAGES_DEPS["$safe_pkg"]="$deps"
-                done
+    local packages_file
+    for packages_file in "${packages_files[@]}"; do
+        local pkg deps
+        # A pipe would run the loop in a subshell and discard the map, so read
+        # from a process substitution instead.
+        while IFS=$'\t' read -r pkg deps; do
+            if [[ -n "${ALL_PACKAGES_DEPS[$pkg]:-}" ]]; then
+                ALL_PACKAGES_DEPS["$pkg"]+=" $deps"
+            else
+                ALL_PACKAGES_DEPS["$pkg"]="$deps"
             fi
-        done
-    done
+        done < <(zcat "$packages_file" 2>/dev/null | awk '
+            BEGIN { RS="\n\n"; FS="\n" }
+            {
+                package = ""
+                depends = ""
+                for (i=1; i<=NF; i++) {
+                    if ($i ~ /^Package: /) {
+                        package = substr($i, 10)
+                    } else if ($i ~ /^(Pre-)?Depends: /) {
+                        # Extract value after "Depends: " or "Pre-Depends: "
+                        idx = index($i, ": ")
+                        val = substr($i, idx + 2)
+                        depends = (depends != "") ? depends ", " val : val
+                    }
+                }
+                if (package == "" || depends == "") next
 
-    log "Preloaded metadata for ${#ALL_PACKAGES_DEPS[@]} packages"
-}
+                # No architecture filter here. This map only discovers
+                # dependency *names*; which file gets downloaded for a name is
+                # decided later by find_package_info(), which does filter by
+                # architecture. Filtering here would drop the dependencies of
+                # any stanza that omits an Architecture field.
 
-# Resolve package dependencies from a specific packages file
-resolve_dependencies_from_file() {
-    local package="$1"
-    local packages_file="$2"
+                # Remove version constraints and alternatives
+                gsub(/\([^)]*\)/, "", depends)
+                gsub(/\|[^,]*/, "", depends)
 
-    local deps=$(zcat "$packages_file" 2>/dev/null | awk -v pkg="$package" '
-        BEGIN { RS="\n\n"; FS="\n" }
-        $1 == "Package: " pkg {
-            for (i=1; i<=NF; i++) {
-                if ($i ~ /^(Pre-)?Depends: /) {
-                    # Extract value after "Depends: " or "Pre-Depends: "
-                    idx = index($i, ": ")
-                    depends = substr($i, idx + 2)
-                    # Remove version constraints and alternatives
-                    gsub(/\([^)]*\)/, "", depends)
-                    gsub(/\|[^,]*/, "", depends)
-                    gsub(/[ \t]+/, " ", depends)
-                    print depends
+                out = ""
+                n = split(depends, parts, ",")
+                for (j = 1; j <= n; j++) {
+                    name = parts[j]
+                    gsub(/[ \t]/, "", name)
+                    # Multiarch qualifiers are dependency syntax, not part of
+                    # the package name.
+                    sub(/:(any|native)$/, "", name)
+                    if (name == "") continue
+                    out = (out == "") ? name : out " " name
+                }
+                if (out != "") {
+                    print package "\t" out
                 }
             }
-        }
-    ')
+        ')
+    done
 
-    if [[ -n "$deps" ]]; then
-        # Split dependencies and clean up. Multiarch qualifiers (perl:any,
-        # python3:any, foo:native) are part of the dependency syntax, not of
-        # the package name, and no Packages file has a stanza for the
-        # qualified form -- strip them or the dependency is reported as not
-        # found in any repository.
-        echo "$deps" | tr ',' '\n' \
-            | sed -e 's/^[ \t]*//;s/[ \t]*$//' -e 's/:\(any\|native\)$//' \
-            | grep -v '^$'
-    fi
+    log "  Indexed dependencies for ${#ALL_PACKAGES_DEPS[@]} packages"
 }
 
 # Download additional direct URLs
@@ -1123,9 +1099,6 @@ download_packages() {
 
     # Initialize with user-requested packages
     packages_to_download=("${PACKAGES[@]}")
-
-    # Skip preloading (too slow) - use on-demand resolution instead
-    # preload_packages_metadata "${REPOSITORIES[@]}"
 
     log "Resolving dependencies for ${#PACKAGES[@]} initial packages..."
 
@@ -1175,7 +1148,11 @@ download_packages() {
 
     log "Loaded ${#packages_files[@]} package metadata files for dependency resolution"
 
-    # Resolve dependencies iteratively using ALL package files
+    # Index every package's dependencies once, up front. Resolving a package
+    # is then a lookup rather than a scan of every metadata file.
+    build_dependency_map "${packages_files[@]}"
+
+    # Resolve dependencies iteratively using the indexed metadata
     local iteration=0
     local max_iterations=10
 
@@ -1194,16 +1171,19 @@ download_packages() {
             processed_packages+=("$package")
             log "    Resolving dependencies for: $package"
 
-            # Find dependencies in ALL package files from ALL repositories
-            for packages_file in "${packages_files[@]}"; do
-                local deps=$(resolve_dependencies_from_file "$package" "$packages_file")
-                if [[ -n "$deps" ]]; then
-                    while IFS= read -r dep; do
-                        if [[ -n "$dep" && ! " ${processed_packages[@]} " =~ " ${dep} " ]]; then
-                            new_dependencies+=("$dep")
-                            log "      Found dependency: $dep"
-                        fi
-                    done <<< "$deps"
+            # Split the dependency list on spaces explicitly rather than
+            # relying on the ambient IFS, which other code in this function
+            # changes; an inherited IFS would collapse the whole list into a
+            # single bogus package name.
+            local -a dep_names=()
+            if [[ -n "${ALL_PACKAGES_DEPS[$package]:-}" ]]; then
+                IFS=' ' read -r -a dep_names <<< "${ALL_PACKAGES_DEPS[$package]}"
+            fi
+
+            for dep in "${dep_names[@]}"; do
+                if [[ -n "$dep" && ! " ${processed_packages[@]} " =~ " ${dep} " ]]; then
+                    new_dependencies+=("$dep")
+                    log "      Found dependency: $dep"
                 fi
             done
         done
