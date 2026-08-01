@@ -1515,7 +1515,28 @@ cleanup() {
     if [[ -d "$TEMP_DIR" ]]; then
         rm -rf "$TEMP_DIR"
     fi
-    success "Cleanup completed"
+    # Deliberately not success(): this reports on the cleanup step only, and
+    # on a failed run a "SUCCESS:" line here is the last thing in the log.
+    log "Cleanup completed"
+}
+
+# Exit handler. Runs cleanup, then states the outcome of the run as the final
+# line of the log, so that the tail of the log -- which is what a failure
+# report or a log excerpt shows -- says whether the run passed or failed
+# instead of ending on a cleanup message.
+on_exit() {
+    local exit_code=$?
+
+    cleanup
+
+    if [[ $exit_code -eq 0 ]]; then
+        success "Mirror creation finished successfully"
+    else
+        log "${RED}FAILED: mirror creation aborted with exit code $exit_code${NC}"
+        log "${RED}        the cause is on the ERROR line above${NC}"
+    fi
+
+    return $exit_code
 }
 
 # Build container image
@@ -1583,8 +1604,8 @@ main() {
     log "$(date): Script execution finished"
 }
 
-# Trap for cleanup on exit
-trap cleanup EXIT
+# Trap for cleanup and outcome reporting on exit
+trap on_exit EXIT
 
 # Run main function
 main "$@"
