@@ -508,6 +508,12 @@ parallel_download_files() {
 
     log "  Total parallel download results: $total_success succeeded, $total_failed failed, $total_skipped skipped"
 
+    # Record what is still missing after the retry rounds, so the run summary
+    # and the caller can report it.
+    if [[ ${#failed_urls[@]} -gt 0 ]]; then
+        FAILED_URLS+=("${failed_urls[@]}")
+    fi
+
     return $total_failed
 }
 
