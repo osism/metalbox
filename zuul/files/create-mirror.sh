@@ -38,8 +38,8 @@ RETRY_BACKOFF_SECONDS="${RETRY_BACKOFF_SECONDS:-15}"
 # Performance optimizations
 PACKAGES_CACHE_DIR="$TEMP_DIR/packages_cache"
 # Expected checksums harvested from the repository indexes, as
-# "filename<TAB>sha256<TAB>size" records. Written while resolving package URLs
-# and consulted after each download.
+# "url<TAB>sha256<TAB>size" records. Written while resolving package URLs and
+# consulted after each download, matched on the URL the file came from.
 PACKAGES_CHECKSUM_FILE="$TEMP_DIR/expected_checksums.tsv"
 
 # Colors for output
@@ -153,16 +153,23 @@ download_file() {
 
 # Record the expected checksum of a package file, as advertised by the
 # repository index it was resolved from.
+#
+# Keyed by the full download URL rather than by basename. find_best_package()
+# asks every configured repository for a candidate and only then picks a
+# winner, so candidates that lose the version or priority comparison are
+# recorded too. Keying by basename would let a losing repository's checksum be
+# matched against the winner's download, which is correct only as long as any
+# two repositories sharing a filename also serve identical bytes.
 record_package_checksum() {
-    local filename="$1"
+    local url="$1"
     local sha256="$2"
     local size="$3"
 
-    if [[ -z "$filename" || -z "$sha256" || -z "${PACKAGES_CHECKSUM_FILE:-}" ]]; then
+    if [[ -z "$url" || -z "$sha256" || -z "${PACKAGES_CHECKSUM_FILE:-}" ]]; then
         return 0
     fi
 
-    printf '%s\t%s\t%s\n' "$filename" "$sha256" "$size" >> "$PACKAGES_CHECKSUM_FILE"
+    printf '%s\t%s\t%s\n' "$url" "$sha256" "$size" >> "$PACKAGES_CHECKSUM_FILE"
 }
 
 # Verify a downloaded file. Prefers the SHA256 and Size advertised by the
@@ -171,15 +178,16 @@ record_package_checksum() {
 # returns non-zero when the file must be discarded.
 verify_downloaded_file() {
     local path="$1"
+    local url="$2"
     local filename
     filename=$(basename "$path")
 
     local expected_sha256=""
     local expected_size=""
 
-    if [[ -n "${PACKAGES_CHECKSUM_FILE:-}" && -f "$PACKAGES_CHECKSUM_FILE" ]]; then
+    if [[ -n "$url" && -n "${PACKAGES_CHECKSUM_FILE:-}" && -f "$PACKAGES_CHECKSUM_FILE" ]]; then
         local record
-        record=$(awk -F'\t' -v f="$filename" '$1 == f { print; exit }' "$PACKAGES_CHECKSUM_FILE" 2>/dev/null)
+        record=$(awk -F'\t' -v u="$url" '$1 == u { print; exit }' "$PACKAGES_CHECKSUM_FILE" 2>/dev/null)
         if [[ -n "$record" ]]; then
             IFS=$'\t' read -r _ expected_sha256 expected_size <<< "$record"
         fi
@@ -292,7 +300,7 @@ parallel_download_single() {
             # example a chunked response truncated by the server), so the
             # content has to be checked, not just its presence.
             local verify_reason=""
-            if ! verify_reason=$(verify_downloaded_file "$output"); then
+            if ! verify_reason=$(verify_downloaded_file "$output" "$url"); then
                 echo "        - Failed (corrupt): $filename ($verify_reason)" >&2
                 echo "FAILED: $filename (corrupt: $verify_reason)" >> "$temp_log"
                 rm -f "$output"
@@ -748,7 +756,7 @@ find_package_info() {
     if [[ -n "$package_info" ]]; then
         local version=$(echo "$package_info" | cut -d'|' -f1)
         local filename=$(echo "$package_info" | cut -d'|' -f2)
-        record_package_checksum "$(basename "$filename")" \
+        record_package_checksum "$base_url/$filename" \
             "$(echo "$package_info" | cut -d'|' -f3)" \
             "$(echo "$package_info" | cut -d'|' -f4)"
         local result="$version|$base_url/$filename"
@@ -844,7 +852,7 @@ find_latest_netbird_version() {
                             if [[ -z "$latest_version" ]] || [[ $(version_compare "$version" "$latest_version") -eq 1 ]]; then
                                 latest_version="$version"
                                 latest_url="$base_url/$filename"
-                                record_package_checksum "$(basename "$filename")" \
+                                record_package_checksum "$latest_url" \
                                     "$(echo "$package_info" | cut -d'|' -f3)" \
                                     "$(echo "$package_info" | cut -d'|' -f4)"
                             fi
@@ -923,7 +931,7 @@ find_all_package_versions() {
                         if [[ -n "$package_info" ]]; then
                             local filename=$(echo "$package_info" | cut -d'|' -f2)
                             all_urls+=("$base_url/$filename")
-                            record_package_checksum "$(basename "$filename")" \
+                            record_package_checksum "$base_url/$filename" \
                                 "$(echo "$package_info" | cut -d'|' -f3)" \
                                 "$(echo "$package_info" | cut -d'|' -f4)"
                         fi
