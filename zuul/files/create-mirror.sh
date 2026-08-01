@@ -231,6 +231,11 @@ parallel_download_single() {
             result=1
         fi
     else
+        # wget/curl truncate the output file before transferring, so a failed
+        # transfer leaves a partial file behind. It is non-empty, so every
+        # later [[ -s ]] check accepts it and it ends up in the repository,
+        # where dpkg-scanpackages fails on it. Drop it here.
+        rm -f "$output"
         echo "        - Failed (download error): $filename" >&2
         echo "FAILED: $filename (download error)" >> "$temp_log"
         result=1
