@@ -614,8 +614,9 @@ parallel_package_lookups() {
                 else
                     log "    Already have: $deb_filename"
                     # Mark as downloaded since we already have it
-                    if [[ ! " ${downloaded_packages[@]} " =~ " ${package_name} " ]]; then
+                    if [[ -z "${downloaded_seen[$package_name]:-}" ]]; then
                         downloaded_packages+=("$package_name")
+                        downloaded_seen["$package_name"]=1
                     fi
                 fi
             fi
@@ -1096,6 +1097,12 @@ download_packages() {
     local failed_packages=()
     local packages_to_download=()
     local processed_packages=()
+    # Membership sets kept alongside the arrays above. Scanning
+    # " ${array[@]} " with =~ rebuilds the whole array into a string on every
+    # test, which is quadratic in the number of packages, and it treats the
+    # needle as a regular expression.
+    local -A processed_seen=()
+    local -A downloaded_seen=()
 
     # Initialize with user-requested packages
     packages_to_download=("${PACKAGES[@]}")
@@ -1164,11 +1171,12 @@ download_packages() {
 
         for package in "${packages_to_download[@]}"; do
             # Skip if already processed
-            if [[ " ${processed_packages[@]} " =~ " ${package} " ]]; then
+            if [[ -n "${processed_seen[$package]:-}" ]]; then
                 continue
             fi
 
             processed_packages+=("$package")
+            processed_seen["$package"]=1
             log "    Resolving dependencies for: $package"
 
             # Split the dependency list on spaces explicitly rather than
@@ -1181,7 +1189,7 @@ download_packages() {
             fi
 
             for dep in "${dep_names[@]}"; do
-                if [[ -n "$dep" && ! " ${processed_packages[@]} " =~ " ${dep} " ]]; then
+                if [[ -n "$dep" && -z "${processed_seen[$dep]:-}" ]]; then
                     new_dependencies+=("$dep")
                     log "      Found dependency: $dep"
                 fi
@@ -1191,7 +1199,7 @@ download_packages() {
         # Remove duplicates and update packages_to_download
         packages_to_download=()
         for dep in "${new_dependencies[@]}"; do
-            if [[ ! " ${processed_packages[@]} " =~ " ${dep} " ]]; then
+            if [[ -z "${processed_seen[$dep]:-}" ]]; then
                 packages_to_download+=("$dep")
             fi
         done
@@ -1218,7 +1226,7 @@ download_packages() {
                 packages_to_lookup+=("$package")
                 ;;
             *)
-                if [[ ! " ${downloaded_packages[@]} " =~ " ${package} " ]]; then
+                if [[ -z "${downloaded_seen[$package]:-}" ]]; then
                     packages_to_lookup+=("$package")
                 fi
                 ;;
@@ -1348,8 +1356,9 @@ download_packages() {
 
                 # Mark package as downloaded if any version was downloaded
                 if [[ "$package_downloaded" == true ]]; then
-                    if [[ ! " ${downloaded_packages[@]} " =~ " ${package} " ]]; then
+                    if [[ -z "${downloaded_seen[$package]:-}" ]]; then
                         downloaded_packages+=("$package")
+                        downloaded_seen["$package"]=1
                     fi
                 fi
             done
@@ -1362,7 +1371,7 @@ download_packages() {
 
     # Check for failed packages (only check originally requested packages)
     for package in "${PACKAGES[@]}"; do
-        if [[ ! " ${downloaded_packages[@]} " =~ " ${package} " ]]; then
+        if [[ -z "${downloaded_seen[$package]:-}" ]]; then
             failed_packages+=("$package")
         fi
     done
