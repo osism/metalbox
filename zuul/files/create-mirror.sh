@@ -8,7 +8,8 @@
 # - DOWNLOAD_BATCH_SIZE: Size multiplier for download batches (default: 5, results in PARALLEL_DOWNLOADS * 5 per batch)
 # - LOOKUP_BATCH_SIZE: Size multiplier for lookup batches (default: 4, results in PARALLEL_DOWNLOADS * 4 per batch)
 # - RETRY_FAILED_DOWNLOADS: Enable retry of failed downloads (default: true)
-# - MAX_RETRY_COUNT: Maximum number of failed downloads to retry (default: 20)
+# - MAX_RETRY_ROUNDS: Maximum number of retry rounds for failed downloads (default: 3)
+# - RETRY_BACKOFF_SECONDS: Delay between retry rounds (default: 15)
 # - MIRROR_DIR: Directory for the mirror (default: /tmp/repository)
 # - SCRIPT_DIR: Directory containing config files
 
@@ -31,7 +32,8 @@ PARALLEL_DOWNLOADS="${PARALLEL_DOWNLOADS:-10}"
 DOWNLOAD_BATCH_SIZE="${DOWNLOAD_BATCH_SIZE:-5}"
 LOOKUP_BATCH_SIZE="${LOOKUP_BATCH_SIZE:-4}"
 RETRY_FAILED_DOWNLOADS="${RETRY_FAILED_DOWNLOADS:-true}"
-MAX_RETRY_COUNT="${MAX_RETRY_COUNT:-20}"
+MAX_RETRY_ROUNDS="${MAX_RETRY_ROUNDS:-3}"
+RETRY_BACKOFF_SECONDS="${RETRY_BACKOFF_SECONDS:-15}"
 
 # Performance optimizations
 PACKAGES_CACHE_DIR="$TEMP_DIR/packages_cache"
@@ -356,50 +358,72 @@ parallel_download_files() {
         fi
     done
 
-    # Retry failed downloads once with reduced concurrency for better reliability
-    if [[ "$RETRY_FAILED_DOWNLOADS" == "true" ]] && [[ ${#failed_urls[@]} -gt 0 ]] && [[ ${#failed_urls[@]} -le $MAX_RETRY_COUNT ]]; then
-        log "  Retrying ${#failed_urls[@]} failed downloads with reduced concurrency..."
-
-        local retry_temp_log="$TEMP_DIR/retry_download_log_$$.txt"
-        > "$retry_temp_log"
-
-        local retry_url_list="$TEMP_DIR/retry_url_list_$$.txt"
-        > "$retry_url_list"
-
-        for url in "${failed_urls[@]}"; do
-            local filename=$(basename "$url")
-            local output_path="$download_dir/$filename"
-            echo "$url|$output_path" >> "$retry_url_list"
-        done
-
+    # Retry failed downloads with reduced concurrency. The retry budget is a
+    # number of rounds, not a ceiling on how many failures are eligible: a
+    # mirror that fails many downloads at once is precisely the case that
+    # needs retrying, and giving up then leaves the repository incomplete.
+    if [[ "$RETRY_FAILED_DOWNLOADS" == "true" ]] && [[ ${#failed_urls[@]} -gt 0 ]]; then
         # Use reduced concurrency for retries (max 3 concurrent)
         local retry_concurrency=$((PARALLEL_DOWNLOADS > 3 ? 3 : PARALLEL_DOWNLOADS))
+        local retry_round=0
 
-        cat "$retry_url_list" | xargs -P "$retry_concurrency" -I {} bash -c '
-            IFS="|" read -r url output <<< "{}"
-            parallel_download_single "$url" "$output" "'$retry_temp_log'"
-        '
+        while [[ ${#failed_urls[@]} -gt 0 && $retry_round -lt $MAX_RETRY_ROUNDS ]]; do
+            retry_round=$((retry_round + 1))
 
-        # Process retry results
-        local retry_success=0
-        local retry_failed=0
+            log "  Retry round $retry_round/$MAX_RETRY_ROUNDS: ${#failed_urls[@]} downloads (concurrency $retry_concurrency)..."
 
-        while IFS= read -r line; do
-            if [[ "$line" == SUCCESS:* ]]; then
-                retry_success=$((retry_success + 1))
-                total_success=$((total_success + 1))
-                total_failed=$((total_failed - 1))
-            elif [[ "$line" == FAILED:* ]]; then
-                retry_failed=$((retry_failed + 1))
-                warning "      Retry $line"
+            local retry_temp_log="$TEMP_DIR/retry_download_log_${retry_round}_$$.txt"
+            > "$retry_temp_log"
+
+            local retry_url_list="$TEMP_DIR/retry_url_list_${retry_round}_$$.txt"
+            > "$retry_url_list"
+
+            # Map basename back to URL so a later round can retry whatever is
+            # still missing.
+            declare -A retry_url_by_name=()
+            for url in "${failed_urls[@]}"; do
+                local filename=$(basename "$url")
+                retry_url_by_name["$filename"]="$url"
+                echo "$url|$download_dir/$filename" >> "$retry_url_list"
+            done
+
+            xargs -a "$retry_url_list" -P "$retry_concurrency" -I {} bash -c '
+                IFS="|" read -r url output <<< "{}"
+                parallel_download_single "$url" "$output" "'"$retry_temp_log"'"
+            '
+
+            # Process retry results
+            local retry_success=0
+            local still_failed=()
+
+            while IFS= read -r line; do
+                if [[ "$line" == SUCCESS:* ]]; then
+                    retry_success=$((retry_success + 1))
+                    total_success=$((total_success + 1))
+                    total_failed=$((total_failed - 1))
+                elif [[ "$line" == FAILED:* ]]; then
+                    local failed_filename=${line#FAILED: }
+                    failed_filename=${failed_filename%% (*}
+                    if [[ -n "${retry_url_by_name[$failed_filename]:-}" ]]; then
+                        still_failed+=("${retry_url_by_name[$failed_filename]}")
+                    fi
+                    warning "      Retry $line"
+                fi
+            done < "$retry_temp_log"
+
+            log "    Retry round $retry_round: $retry_success recovered, ${#still_failed[@]} still failed"
+
+            rm -f "$retry_temp_log" "$retry_url_list"
+
+            failed_urls=("${still_failed[@]}")
+
+            # Back off before the next round to give a struggling mirror a
+            # chance to recover.
+            if [[ ${#failed_urls[@]} -gt 0 && $retry_round -lt $MAX_RETRY_ROUNDS ]]; then
+                log "    Waiting ${RETRY_BACKOFF_SECONDS}s before the next retry round..."
+                sleep "$RETRY_BACKOFF_SECONDS"
             fi
-        done < "$retry_temp_log"
-
-        log "    Retry results: $retry_success recovered, $retry_failed still failed"
-
-        rm -f "$retry_temp_log" "$retry_url_list"
-    elif [[ ${#failed_urls[@]} -gt $MAX_RETRY_COUNT ]]; then
-        log "    Too many failed downloads (${#failed_urls[@]}) - skipping retry to avoid overwhelming servers (max: $MAX_RETRY_COUNT)"
+        done
     fi
 
     log "  Total parallel download results: $total_success succeeded, $total_failed failed, $total_skipped skipped"
@@ -1415,7 +1439,7 @@ main() {
     log "  - Parallel downloads: $PARALLEL_DOWNLOADS concurrent connections"
     log "  - Download batch size: $((PARALLEL_DOWNLOADS * DOWNLOAD_BATCH_SIZE)) files per batch (${PARALLEL_DOWNLOADS} × ${DOWNLOAD_BATCH_SIZE})"
     log "  - Lookup batch size: $((PARALLEL_DOWNLOADS * LOOKUP_BATCH_SIZE)) packages per batch (${PARALLEL_DOWNLOADS} × ${LOOKUP_BATCH_SIZE})"
-    log "  - Retry failed downloads: $RETRY_FAILED_DOWNLOADS (max: $MAX_RETRY_COUNT)"
+    log "  - Retry failed downloads: $RETRY_FAILED_DOWNLOADS (rounds: $MAX_RETRY_ROUNDS, backoff: ${RETRY_BACKOFF_SECONDS}s)"
 
     check_dependencies
     read_config
