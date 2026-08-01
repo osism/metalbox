@@ -700,7 +700,7 @@ find_package_info() {
     # Filter by architecture to avoid downloading wrong arch (e.g. armhf instead of amd64)
     local package_info=$(zcat "$cache_file" 2>/dev/null | awk -v pkg="$package_name" -v arch="$target_arch" '
         BEGIN { RS="\n\n"; FS="\n" }
-        $1 ~ "^Package: " pkg "$" {
+        $1 == "Package: " pkg {
             filename = ""
             version = ""
             pkg_arch = ""
@@ -791,7 +791,7 @@ find_latest_netbird_version() {
                 # Extract all versions and find the latest
                 local package_infos=$(zcat "$packages_file" 2>/dev/null | awk -v pkg="$package_name" -v target_arch="$arch" '
                     BEGIN { RS="\n\n"; FS="\n" }
-                    $1 ~ "^Package: " pkg "$" {
+                    $1 == "Package: " pkg {
                         filename = ""
                         version = ""
                         pkg_arch = ""
@@ -875,7 +875,7 @@ find_all_package_versions() {
                 # Extract all versions of the package
                 local package_infos=$(zcat "$packages_file" 2>/dev/null | awk -v pkg="$package_name" -v target_arch="$arch" '
                     BEGIN { RS="\n\n"; FS="\n" }
-                    $1 ~ "^Package: " pkg "$" {
+                    $1 == "Package: " pkg {
                         filename = ""
                         version = ""
                         pkg_arch = ""
@@ -1065,7 +1065,7 @@ resolve_dependencies_from_file() {
 
     local deps=$(zcat "$packages_file" 2>/dev/null | awk -v pkg="$package" '
         BEGIN { RS="\n\n"; FS="\n" }
-        $1 ~ "^Package: " pkg "$" {
+        $1 == "Package: " pkg {
             for (i=1; i<=NF; i++) {
                 if ($i ~ /^(Pre-)?Depends: /) {
                     # Extract value after "Depends: " or "Pre-Depends: "
