@@ -1082,8 +1082,14 @@ resolve_dependencies_from_file() {
     ')
 
     if [[ -n "$deps" ]]; then
-        # Split dependencies and clean up
-        echo "$deps" | tr ',' '\n' | sed 's/^[ \t]*//;s/[ \t]*$//' | grep -v '^$'
+        # Split dependencies and clean up. Multiarch qualifiers (perl:any,
+        # python3:any, foo:native) are part of the dependency syntax, not of
+        # the package name, and no Packages file has a stanza for the
+        # qualified form -- strip them or the dependency is reported as not
+        # found in any repository.
+        echo "$deps" | tr ',' '\n' \
+            | sed -e 's/^[ \t]*//;s/[ \t]*$//' -e 's/:\(any\|native\)$//' \
+            | grep -v '^$'
     fi
 }
 
