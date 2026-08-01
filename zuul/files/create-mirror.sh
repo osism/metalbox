@@ -1424,9 +1424,23 @@ create_repository() {
         error "No .deb files found to copy"
     fi
 
-    # Generate Packages file
+    # Generate Packages file.
+    #
+    # Keep dpkg-scanpackages' diagnostics: its stderr is the only thing that
+    # names the offending file when it refuses to parse a package, and it
+    # exits 25 on every error, which on its own says nothing. Warnings about
+    # a missing override file are expected here and are filtered out so they
+    # do not look like failures.
     cd "$repo_dir"
-    dpkg-scanpackages --multiversion pool/main /dev/null > dists/stable/main/binary-amd64/Packages 2>/dev/null
+    local scan_errors="$TEMP_DIR/dpkg-scanpackages.err"
+    if ! dpkg-scanpackages --multiversion pool/main /dev/null \
+            > dists/stable/main/binary-amd64/Packages 2> "$scan_errors"; then
+        log "${RED}dpkg-scanpackages failed while indexing $repo_dir:${NC}"
+        grep -vE 'missing from override file|^dpkg-scanpackages: warning:   ' "$scan_errors" >&2 || true
+        error "Failed to generate the Packages index"
+    fi
+    grep -vE 'missing from override file|^dpkg-scanpackages: warning:   ' "$scan_errors" >&2 || true
+
     gzip -9c dists/stable/main/binary-amd64/Packages > dists/stable/main/binary-amd64/Packages.gz
 
     # Create Release file with proper checksums
