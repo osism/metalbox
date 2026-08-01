@@ -37,6 +37,10 @@ RETRY_BACKOFF_SECONDS="${RETRY_BACKOFF_SECONDS:-15}"
 
 # Performance optimizations
 PACKAGES_CACHE_DIR="$TEMP_DIR/packages_cache"
+# Expected checksums harvested from the repository indexes, as
+# "filename<TAB>sha256<TAB>size" records. Written while resolving package URLs
+# and consulted after each download.
+PACKAGES_CHECKSUM_FILE="$TEMP_DIR/expected_checksums.tsv"
 declare -A PACKAGES_METADATA_CACHE
 
 # Colors for output
@@ -148,6 +152,71 @@ download_file() {
     fi
 }
 
+# Record the expected checksum of a package file, as advertised by the
+# repository index it was resolved from.
+record_package_checksum() {
+    local filename="$1"
+    local sha256="$2"
+    local size="$3"
+
+    if [[ -z "$filename" || -z "$sha256" || -z "${PACKAGES_CHECKSUM_FILE:-}" ]]; then
+        return 0
+    fi
+
+    printf '%s\t%s\t%s\n' "$filename" "$sha256" "$size" >> "$PACKAGES_CHECKSUM_FILE"
+}
+
+# Verify a downloaded file. Prefers the SHA256 and Size advertised by the
+# repository index; falls back to a structural check for files downloaded
+# from a direct URL, which have no index metadata. Prints the reason and
+# returns non-zero when the file must be discarded.
+verify_downloaded_file() {
+    local path="$1"
+    local filename
+    filename=$(basename "$path")
+
+    local expected_sha256=""
+    local expected_size=""
+
+    if [[ -n "${PACKAGES_CHECKSUM_FILE:-}" && -f "$PACKAGES_CHECKSUM_FILE" ]]; then
+        local record
+        record=$(awk -F'\t' -v f="$filename" '$1 == f { print; exit }' "$PACKAGES_CHECKSUM_FILE" 2>/dev/null)
+        if [[ -n "$record" ]]; then
+            IFS=$'\t' read -r _ expected_sha256 expected_size <<< "$record"
+        fi
+    fi
+
+    if [[ -n "$expected_size" ]]; then
+        local actual_size
+        actual_size=$(stat -c%s "$path" 2>/dev/null)
+        if [[ "$actual_size" != "$expected_size" ]]; then
+            echo "size $actual_size, expected $expected_size"
+            return 1
+        fi
+    fi
+
+    if [[ -n "$expected_sha256" ]]; then
+        local actual_sha256
+        actual_sha256=$(sha256sum "$path" 2>/dev/null | cut -d' ' -f1)
+        if [[ "$actual_sha256" != "$expected_sha256" ]]; then
+            echo "sha256 mismatch"
+            return 1
+        fi
+        return 0
+    fi
+
+    # No index metadata for this file. Make sure it is at least a readable
+    # Debian archive, which is what dpkg-scanpackages will demand later.
+    if [[ "$filename" == *.deb ]] && command -v dpkg-deb >/dev/null 2>&1; then
+        if ! dpkg-deb --info "$path" >/dev/null 2>&1; then
+            echo "not a readable Debian archive"
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
 # Build Packages index URL for a repository
 # For flat repos (component="flat"), the Packages file is at $base_url/$dist/Packages.gz
 # For standard repos, it's at $base_url/dists/$dist/$component/binary-$arch/Packages.gz
@@ -220,6 +289,17 @@ parallel_download_single() {
 
     if download_file "$url" "$output"; then
         if [[ -f "$output" && -s "$output" ]]; then
+            # A transfer that ends early still exits 0 in some cases (for
+            # example a chunked response truncated by the server), so the
+            # content has to be checked, not just its presence.
+            local verify_reason=""
+            if ! verify_reason=$(verify_downloaded_file "$output"); then
+                echo "        - Failed (corrupt): $filename ($verify_reason)" >&2
+                echo "FAILED: $filename (corrupt: $verify_reason)" >> "$temp_log"
+                rm -f "$output"
+                return 1
+            fi
+
             if [[ "$is_large_file" == "true" ]]; then
                 echo "        + Downloaded: $filename" >&2
             else
@@ -299,8 +379,8 @@ parallel_download_files() {
         done
 
         # Process downloads within this batch sequentially, but with parallel downloads within the batch
-        export -f parallel_download_single download_file
-        export TEMP_DIR
+        export -f parallel_download_single download_file verify_downloaded_file
+        export TEMP_DIR PACKAGES_CHECKSUM_FILE
 
         if [[ -s "$url_list" ]]; then
             local urls_in_batch=$(wc -l < "$url_list")
@@ -488,8 +568,8 @@ parallel_package_lookups() {
     printf '%s\n' "${packages[@]}" > "$package_list"
 
     # Export functions and variables needed by subprocesses
-    export -f parallel_package_lookup find_best_package find_package_info find_all_package_versions find_latest_netbird_version version_compare download_file cache_packages_file build_packages_url
-    export TEMP_DIR PACKAGES_CACHE_DIR
+    export -f parallel_package_lookup find_best_package find_package_info find_all_package_versions find_latest_netbird_version version_compare download_file cache_packages_file build_packages_url record_package_checksum
+    export TEMP_DIR PACKAGES_CACHE_DIR PACKAGES_CHECKSUM_FILE
     export -A PACKAGES_METADATA_CACHE
 
     # Use xargs for package lookups (GNU parallel disabled due to argument parsing issues)
@@ -618,6 +698,8 @@ find_package_info() {
             filename = ""
             version = ""
             pkg_arch = ""
+            sha256 = ""
+            size = ""
             for (i=1; i<=NF; i++) {
                 if ($i ~ /^Filename: /) {
                     filename = substr($i, 11)
@@ -628,9 +710,15 @@ find_package_info() {
                 if ($i ~ /^Architecture: /) {
                     pkg_arch = substr($i, 15)
                 }
+                if ($i ~ /^SHA256: /) {
+                    sha256 = substr($i, 9)
+                }
+                if ($i ~ /^Size: /) {
+                    size = substr($i, 7)
+                }
             }
             if (filename != "" && version != "" && (pkg_arch == arch || pkg_arch == "all")) {
-                print version "|" filename
+                print version "|" filename "|" sha256 "|" size
             }
         }
     ' | sort -t'|' -k1,1V | tail -1)
@@ -638,6 +726,9 @@ find_package_info() {
     if [[ -n "$package_info" ]]; then
         local version=$(echo "$package_info" | cut -d'|' -f1)
         local filename=$(echo "$package_info" | cut -d'|' -f2)
+        record_package_checksum "$(basename "$filename")" \
+            "$(echo "$package_info" | cut -d'|' -f3)" \
+            "$(echo "$package_info" | cut -d'|' -f4)"
         local result="$version|$base_url/$filename"
 
         # Cache the result
@@ -698,6 +789,8 @@ find_latest_netbird_version() {
                         filename = ""
                         version = ""
                         pkg_arch = ""
+                        sha256 = ""
+                        size = ""
                         for (i=1; i<=NF; i++) {
                             if ($i ~ /^Filename: /) {
                                 filename = substr($i, 11)
@@ -708,9 +801,15 @@ find_latest_netbird_version() {
                             if ($i ~ /^Architecture: /) {
                                 pkg_arch = substr($i, 15)
                             }
+                            if ($i ~ /^SHA256: /) {
+                                sha256 = substr($i, 9)
+                            }
+                            if ($i ~ /^Size: /) {
+                                size = substr($i, 7)
+                            }
                         }
                         if (filename != "" && version != "" && (pkg_arch == target_arch || pkg_arch == "all")) {
-                            print version "|" filename
+                            print version "|" filename "|" sha256 "|" size
                         }
                     }
                 ')
@@ -725,6 +824,9 @@ find_latest_netbird_version() {
                             if [[ -z "$latest_version" ]] || [[ $(version_compare "$version" "$latest_version") -eq 1 ]]; then
                                 latest_version="$version"
                                 latest_url="$base_url/$filename"
+                                record_package_checksum "$(basename "$filename")" \
+                                    "$(echo "$package_info" | cut -d'|' -f3)" \
+                                    "$(echo "$package_info" | cut -d'|' -f4)"
                             fi
                         fi
                     done <<< "$package_infos"
@@ -771,6 +873,8 @@ find_all_package_versions() {
                         filename = ""
                         version = ""
                         pkg_arch = ""
+                        sha256 = ""
+                        size = ""
                         for (i=1; i<=NF; i++) {
                             if ($i ~ /^Filename: /) {
                                 filename = substr($i, 11)
@@ -781,9 +885,15 @@ find_all_package_versions() {
                             if ($i ~ /^Architecture: /) {
                                 pkg_arch = substr($i, 15)
                             }
+                            if ($i ~ /^SHA256: /) {
+                                sha256 = substr($i, 9)
+                            }
+                            if ($i ~ /^Size: /) {
+                                size = substr($i, 7)
+                            }
                         }
                         if (filename != "" && version != "" && (pkg_arch == target_arch || pkg_arch == "all")) {
-                            print version "|" filename
+                            print version "|" filename "|" sha256 "|" size
                         }
                     }
                 ')
@@ -793,6 +903,9 @@ find_all_package_versions() {
                         if [[ -n "$package_info" ]]; then
                             local filename=$(echo "$package_info" | cut -d'|' -f2)
                             all_urls+=("$base_url/$filename")
+                            record_package_checksum "$(basename "$filename")" \
+                                "$(echo "$package_info" | cut -d'|' -f3)" \
+                                "$(echo "$package_info" | cut -d'|' -f4)"
                         fi
                     done <<< "$package_infos"
                 fi
