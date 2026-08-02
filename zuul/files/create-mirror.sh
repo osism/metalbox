@@ -17,6 +17,10 @@ set -e
 
 # Global array to track failed URLs
 declare -a FAILED_URLS=()
+# Package indexes that could not be fetched while collecting metadata. Lookup
+# stage failures are counted separately, from the markers left by
+# report_index_fetch_failure(), because those happen in worker processes.
+INDEX_FETCH_FAILURES=0
 # Flag to track if summary was already shown
 SUMMARY_SHOWN=false
 
@@ -1138,6 +1142,57 @@ download_direct_urls() {
     fi
 }
 
+# Refuse to build a repository from an incomplete package set.
+#
+# Publishing replaces the only copy of the mirror tarball -- the S3 object has
+# a fixed name and no history -- so a short mirror is worse than a failed run:
+# it overwrites a good artifact with a bad one and reports success, while a
+# failed run leaves the previous night's mirror in place.
+#
+# All three conditions are zero on a healthy run: ten runs sampled between
+# 2026-07-03 and 2026-08-02 fetched every index, lost no download, and were
+# missing no requested package.
+assert_mirror_complete() {
+    local failed_packages=("$@")
+
+    local index_failures=$INDEX_FETCH_FAILURES
+    if [[ -d "$PACKAGES_CACHE_DIR" ]]; then
+        # A marker records that one attempt failed, not that the index is
+        # missing. Markers are never removed, and an index can still arrive
+        # afterwards: a concurrent worker may publish a complete copy while
+        # this one is failing over between formats -- which is why
+        # cache_packages_file() refuses to remove $cache_file on that path --
+        # and a later worker retries the download because no cache file
+        # exists yet. Counting markers alone would abort a run whose indexes
+        # were all fetched in the end. The cache file is the authority.
+        local marker cache_key
+        while IFS= read -r marker; do
+            [[ -n "$marker" ]] || continue
+            cache_key="${marker##*/.fetch-failed-}"
+            [[ -f "$PACKAGES_CACHE_DIR/${cache_key}.gz" ]] && continue
+            index_failures=$((index_failures + 1))
+        done < <(find "$PACKAGES_CACHE_DIR" -maxdepth 1 -type d -name '.fetch-failed-*' 2>/dev/null)
+    fi
+
+    if [[ $index_failures -eq 0 && ${#FAILED_URLS[@]} -eq 0 && ${#failed_packages[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    log ""
+    log "${RED}=== INCOMPLETE MIRROR ===${NC}"
+    if [[ $index_failures -gt 0 ]]; then
+        log "  package indexes that could not be fetched: $index_failures"
+    fi
+    if [[ ${#FAILED_URLS[@]} -gt 0 ]]; then
+        log "  downloads still missing after retries: ${#FAILED_URLS[@]}"
+    fi
+    if [[ ${#failed_packages[@]} -gt 0 ]]; then
+        log "  requested packages missing: ${#failed_packages[@]} (${failed_packages[*]})"
+    fi
+    log ""
+    error "Refusing to build a repository from an incomplete package set"
+}
+
 # Download packages from repositories
 download_packages() {
     log "Starting package download with dependency resolution..."
@@ -1180,6 +1235,7 @@ download_packages() {
                 log "  + Loaded: $dist/$component"
             else
                 log "  - Failed: $dist/$component"
+                INDEX_FETCH_FAILURES=$((INDEX_FETCH_FAILURES + 1))
             fi
         done
     done
@@ -1201,6 +1257,7 @@ download_packages() {
                 log "  + Loaded (restricted): $dist/$component"
             else
                 log "  - Failed (restricted): $dist/$component"
+                INDEX_FETCH_FAILURES=$((INDEX_FETCH_FAILURES + 1))
             fi
         done
     done
@@ -1438,6 +1495,8 @@ download_packages() {
     if [[ ${#failed_packages[@]} -gt 0 ]]; then
         warning "Failed packages: ${failed_packages[*]}"
     fi
+
+    assert_mirror_complete "${failed_packages[@]}"
 
     # Check if we have any .deb files
     local deb_count=$(find "$download_dir" -name "*.deb" | wc -l)
