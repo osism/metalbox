@@ -670,33 +670,55 @@ cache_packages_file() {
     if [[ ! -f "$cache_file" ]]; then
         mkdir -p "$PACKAGES_CACHE_DIR"
 
+        # Stage the download and publish it into the cache only once it is
+        # complete and readable.
+        #
+        # wget and curl create the target file as soon as the transfer starts,
+        # so writing $cache_file directly makes a partial index visible to the
+        # other lookup workers: they see the file exists, skip the download,
+        # read a truncated package list, and report perfectly good packages as
+        # "not found in any repository". Measured on a 19 MB index, the file is
+        # present and incomplete for roughly the first half second, which is
+        # exactly when the first lookup batch runs against a cold cache.
+        #
+        # The staged names carry $$ so concurrent workers never share one, and
+        # mv is atomic within the directory, so a reader sees either no file or
+        # a complete one.
+        local staged="$cache_file.$$.part"
+
         # Try .gz first
-        if download_file "$packages_url" "$cache_file" >/dev/null 2>&1 && [[ -s "$cache_file" ]]; then
+        if download_file "$packages_url" "$staged" >/dev/null 2>&1 && [[ -s "$staged" ]] \
+                && gzip -t "$staged" 2>/dev/null; then
+            mv -f "$staged" "$cache_file"
             return 0
         fi
-        rm -f "$cache_file"
+        rm -f "$staged"
 
         # Try .xz and convert to .gz
         local xz_url="${packages_url%.gz}.xz"
-        local xz_file="${cache_file%.gz}.xz"
+        local xz_file="$cache_file.$$.xz"
         if download_file "$xz_url" "$xz_file" >/dev/null 2>&1 && [[ -s "$xz_file" ]]; then
-            if xzcat "$xz_file" 2>/dev/null | gzip > "$cache_file" 2>/dev/null && [[ -s "$cache_file" ]]; then
+            if xzcat "$xz_file" 2>/dev/null | gzip > "$staged" 2>/dev/null && [[ -s "$staged" ]]; then
                 rm -f "$xz_file"
+                mv -f "$staged" "$cache_file"
                 return 0
             fi
         fi
-        rm -f "$xz_file" "$cache_file"
+        rm -f "$xz_file" "$staged"
 
         # Try uncompressed and convert to .gz
         local plain_url="${packages_url%.gz}"
-        local plain_file="${cache_file%.gz}"
+        local plain_file="$cache_file.$$.plain"
         if download_file "$plain_url" "$plain_file" >/dev/null 2>&1 && [[ -s "$plain_file" ]]; then
-            if gzip -c "$plain_file" > "$cache_file" 2>/dev/null && [[ -s "$cache_file" ]]; then
+            if gzip -c "$plain_file" > "$staged" 2>/dev/null && [[ -s "$staged" ]]; then
                 rm -f "$plain_file"
+                mv -f "$staged" "$cache_file"
                 return 0
             fi
         fi
-        rm -f "$plain_file" "$cache_file"
+        # Never remove $cache_file here: another worker may have published a
+        # complete copy while this one was failing over between formats.
+        rm -f "$plain_file" "$staged"
         report_index_fetch_failure "$packages_url" "$cache_key"
         return 1
     fi
