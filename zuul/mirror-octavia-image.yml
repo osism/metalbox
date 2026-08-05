@@ -40,8 +40,11 @@
 
           sha256sum octavia-export-{{ item }}.img > octavia-export-{{ item }}.img.CHECKSUM
 
-          rclone copyto octavia-export-{{ item }}.img.CHECKSUM s3:osism/metalbox/octavia-export-{{ item }}.img.CHECKSUM
+          # Upload the image before the checksum that describes it, so the
+          # published pair is inconsistent only for the small object and a
+          # failed image upload leaves the previous pair intact.
           rclone copyto octavia-export-{{ item }}.img s3:osism/metalbox/octavia-export-{{ item }}.img
+          rclone copyto octavia-export-{{ item }}.img.CHECKSUM s3:osism/metalbox/octavia-export-{{ item }}.img.CHECKSUM
       environment:
         RCLONE_CONFIG_S3_TYPE: s3
         RCLONE_CONFIG_S3_PROVIDER: Ceph
