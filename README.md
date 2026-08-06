@@ -125,9 +125,6 @@ only published for `2025.1`.
     * If the Metalbox is to be used as a file server for nodes inside the Cloudpod do all
       steps in "Using Metalbox as a file server".
 
-**Note:** When using `run-all.sh`, the SONiC deployment steps can be skipped by setting
-`ENABLE_SONIC=false` (e.g. `ENABLE_SONIC=false ./run-all.sh SITE`). By default, SONiC is enabled.
-
 ### Additional steps for air gap environments
 
 #### Using the Metalbox as an Ubuntu repository server
