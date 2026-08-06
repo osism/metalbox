@@ -161,8 +161,15 @@
       ansible.builtin.shell:  # noqa command-instead-of-module
         executable: /bin/bash
         cmd: |
-          rclone copyto {{ _tarball_name }}.CHECKSUM s3:osism/metalbox/{{ _tarball_name }}.CHECKSUM
+          set -e
+
+          # Upload the tarball before the checksum that describes it, so the
+          # published pair is inconsistent only for the small object and a
+          # failed tarball upload leaves the previous pair intact. set -e is
+          # what makes the order meaningful: without it the checksum would be
+          # published even when the tarball upload failed.
           rclone copyto {{ _tarball_name }} s3:osism/metalbox/{{ _tarball_name }}
+          rclone copyto {{ _tarball_name }}.CHECKSUM s3:osism/metalbox/{{ _tarball_name }}.CHECKSUM
       environment:
         RCLONE_CONFIG_S3_TYPE: s3
         RCLONE_CONFIG_S3_PROVIDER: Ceph

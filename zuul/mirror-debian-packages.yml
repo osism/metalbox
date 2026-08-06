@@ -87,8 +87,13 @@
           version=$(date +%Y%m%d)
           docker push "quay.io/osism-mirror/ubuntu-noble:$version"
 
-          rclone copyto ubuntu-noble.tar.bz2.CHECKSUM s3:osism/metalbox/ubuntu-noble.tar.bz2.CHECKSUM
+          # Upload the tarball before the checksum that describes it. Both
+          # objects have fixed names, so the pair is briefly inconsistent
+          # either way, but this order keeps that window to one small object
+          # instead of the whole tarball transfer, and a failed tarball upload
+          # then leaves the previous artifact and its checksum both intact.
           rclone copyto ubuntu-noble.tar.bz2 s3:osism/metalbox/ubuntu-noble.tar.bz2
+          rclone copyto ubuntu-noble.tar.bz2.CHECKSUM s3:osism/metalbox/ubuntu-noble.tar.bz2.CHECKSUM
       environment:
         RCLONE_CONFIG_S3_TYPE: s3
         RCLONE_CONFIG_S3_PROVIDER: Ceph
