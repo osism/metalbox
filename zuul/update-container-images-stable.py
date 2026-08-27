@@ -23,8 +23,8 @@ library/httpd or rsync:latest) are kept unchanged and reported.
 
 Usage: update-container-images-stable.py [-n] [-v] [-o VERSION] [RELEASE]
 
-  RELEASE                  OSISM release, e.g. 10.2.0. Default: the newest
-                           X.Y.Z release directory in osism/release.
+  RELEASE                  OSISM release, e.g. 10.2.0. Default: the highest
+                           numbered X.Y.Z release directory in osism/release.
   -o, --openstack-version  OpenStack release of the SBOM image. Default: the
                            default of the release repository
                            (latest/openstack.yml).
@@ -109,8 +109,12 @@ MANAGER_IMAGES = {
 RELEASE_VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 LIST_RE = re.compile(r"^(?P<name>[A-Za-z_][A-Za-z0-9_]*):\s*$")
 ITEM_RE = re.compile(r"^(?P<prefix>\s*-\s+)(?P<image>\S+)\s*$")
-KOLLA_ENTRY_RE = re.compile(r"^release/(?P<version>[^/]+)/(?P<name>[^/:]+):(?P<tag>[^/:]+)$")
-SBOM_IMAGE_RE = re.compile(r"^(?:.*/)?kolla/release/(?P<version>[^/]+)/(?P<name>[^/:]+):(?P<tag>[^/:]+)$")
+KOLLA_ENTRY_RE = re.compile(
+    r"^release/(?P<version>[^/]+)/(?P<name>[^/:]+):(?P<tag>[^/:]+)$"
+)
+SBOM_IMAGE_RE = re.compile(
+    r"^(?:.*/)?kolla/release/(?P<version>[^/]+)/(?P<name>[^/:]+):(?P<tag>[^/:]+)$"
+)
 
 
 class Fatal(Exception):
@@ -177,14 +181,19 @@ def default_openstack_version():
         return match.group(1)
     version = load_yaml(text).get("openstack_version")
     if not version:
-        raise Fatal(f"cannot determine the default OpenStack version from latest/openstack.yml: {text!r}")
+        raise Fatal(
+            f"cannot determine the default OpenStack version from latest/openstack.yml: {text!r}"
+        )
     return version
 
 
 def release_versions(release, openstack_version):
     """Return the docker_images of the release plus openstackclient."""
     base = load_yaml(
-        fetch(f"{RELEASE_RAW}/{release}/base.yml", not_found=f"release {release} not found in osism/release")
+        fetch(
+            f"{RELEASE_RAW}/{release}/base.yml",
+            not_found=f"release {release} not found in osism/release",
+        )
     )
     versions = dict(base.get("docker_images") or {})
     if "kolla" not in versions:
@@ -211,7 +220,9 @@ def sbom_via_docker(image):
     run(["docker", "pull", "--quiet", "--platform", "linux/amd64", image])
     # The SBOM image is built from scratch and has no command. docker create
     # insists on one; the container is never started, so any string will do.
-    result = run(["docker", "create", "--platform", "linux/amd64", image, "/images.yml"])
+    result = run(
+        ["docker", "create", "--platform", "linux/amd64", image, "/images.yml"]
+    )
     container = result.stdout.decode().strip()
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -342,11 +353,15 @@ def update_file(path, resolve, dry_run, verbose):
             continue
         updated += 1
         new_name, _, new_tag = new_image.rpartition(":")
-        print(f"  {name:<{width}}  {old_tag} -> {new_tag if new_name == name else new_image}")
+        print(
+            f"  {name:<{width}}  {old_tag} -> {new_tag if new_name == name else new_image}"
+        )
         prefix = ITEM_RE.match(lines[index])["prefix"]
         lines[index] = f"{prefix}{new_image}\n"
 
-    print(f"  {updated} updated, {unchanged} unchanged, {len(entries) - updated - unchanged} kept")
+    print(
+        f"  {updated} updated, {unchanged} unchanged, {len(entries) - updated - unchanged} kept"
+    )
     for message in unresolved:
         warn(message)
 
@@ -358,17 +373,26 @@ def update_file(path, resolve, dry_run, verbose):
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Update zuul/vars/container-images-*-stable.yml from an OSISM release.",
-        epilog="Without RELEASE the newest X.Y.Z release of osism/release is used.",
+        epilog="Without RELEASE the highest numbered X.Y.Z release of osism/release is used.",
     )
-    parser.add_argument("release", nargs="?", metavar="RELEASE", help="OSISM release, e.g. 10.2.0")
+    parser.add_argument(
+        "release", nargs="?", metavar="RELEASE", help="OSISM release, e.g. 10.2.0"
+    )
     parser.add_argument(
         "-o",
         "--openstack-version",
         metavar="VERSION",
         help="OpenStack release of the SBOM image (default: latest/openstack.yml of osism/release)",
     )
-    parser.add_argument("-n", "--dry-run", action="store_true", help="report the changes without writing the files")
-    parser.add_argument("-v", "--verbose", action="store_true", help="also report unchanged entries")
+    parser.add_argument(
+        "-n",
+        "--dry-run",
+        action="store_true",
+        help="report the changes without writing the files",
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="also report unchanged entries"
+    )
     return parser.parse_args()
 
 
@@ -385,7 +409,9 @@ def main():
     kolla_version = versions["kolla"]
     sbom_image = f"{REGISTRY}/kolla/release/{openstack_version}/sbom:{kolla_version}"
 
-    print(f"OSISM release {release}: kolla {kolla_version}, OpenStack {openstack_version}")
+    print(
+        f"OSISM release {release}: kolla {kolla_version}, OpenStack {openstack_version}"
+    )
     print(f"SBOM image: {sbom_image}")
     tags = sbom_tags(sbom_image, openstack_version)
     print()
@@ -396,7 +422,9 @@ def main():
         (MANAGER_FILE, resolve_manager(versions)),
         (OPENSTACK_FILE, resolve_openstack(openstack_version, tags, sbom_image)),
     ):
-        file_changed, file_unresolved = update_file(path, resolve, args.dry_run, args.verbose)
+        file_changed, file_unresolved = update_file(
+            path, resolve, args.dry_run, args.verbose
+        )
         changed = changed or file_changed
         unresolved += file_unresolved
         print()
@@ -409,7 +437,10 @@ def main():
         print("Nothing to do, the files already match the release.")
 
     if unresolved:
-        print(f"{unresolved} entries could not be resolved, see the warnings above.", file=sys.stderr)
+        print(
+            f"{unresolved} entries could not be resolved, see the warnings above.",
+            file=sys.stderr,
+        )
         return 2
     return 0
 
