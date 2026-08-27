@@ -7,9 +7,9 @@ The two stable image lists pin every image of the stable registry tarball
 
   container-images-manager-stable.yml
       Tags come from the docker_images section of <release>/base.yml in
-      https://github.com/osism/release. openstackclient is not pinned in
-      base.yml; like osism-ansible, the script takes it from
-      latest/openstack-<version>.yml.
+      https://github.com/osism/release. base.yml does not pin
+      openstackclient; when the key is missing there, the tag is taken from
+      latest/openstack-<version>.yml, the way osism-ansible resolves it.
 
   container-images-openstack-stable.yml
       The kolla version in base.yml names the SBOM image
@@ -18,28 +18,39 @@ The two stable image lists pin every image of the stable registry tarball
       the file are replaced with the ones listed there.
 
 Only the tags of the images already listed are updated; images are never
-added or removed. Entries without a counterpart in the release (for example
-library/httpd or rsync:latest) are kept unchanged and reported.
+added or removed. The OpenStack release in the kolla entries
+(release/<version>/...) is read from the file and only changed when -o asks
+for another one. Entries without a counterpart in the release (for example
+library/httpd or rsync:latest) are kept unchanged and reported, and so is
+the number of images the release provides that the files do not list.
 
 Usage: update-container-images-stable.py [-n] [-v] [-o VERSION] [RELEASE]
 
   RELEASE                  OSISM release, e.g. 10.2.0. Default: the highest
                            numbered X.Y.Z release directory in osism/release.
-  -o, --openstack-version  OpenStack release of the SBOM image. Default: the
-                           default of the release repository
-                           (latest/openstack.yml).
+  -o, --openstack-version  Move the kolla entries to this OpenStack release.
+                           Default: the release the entries currently use.
   -n, --dry-run            Report the changes without writing the files.
-  -v, --verbose            Also report unchanged entries.
+  -v, --verbose            Also report unchanged entries and name the images
+                           of the release that are not listed.
 
 Requirements: python3 with PyYAML, docker (or crane) to read the SBOM image,
 network access to github.com and registry.osism.tech. GITHUB_TOKEN is sent
 to the GitHub API when set (only needed to avoid the anonymous rate limit).
 
-Exit status: 0 on success, 1 on a fatal error (nothing is written), 2 when
-the files were updated but some entries could not be resolved.
+Exit status: 0 on success, 1 on a fatal error, 2 when some entries could not
+be resolved (the other entries are still updated unless -n is given).
+
+Both files are read, checked and resolved before either is written, so a
+fatal error in that stage leaves them as they were. Each file is then
+replaced atomically: the new content is staged next to it and renamed into
+place, so a failed write leaves that file untouched. The two files are
+written one after the other, not as one transaction; if the second write
+fails, git diff zuul/vars shows what the first one changed.
 """
 
 import argparse
+import contextlib
 import io
 import json
 import os
@@ -51,7 +62,8 @@ import tarfile
 import tempfile
 import urllib.error
 import urllib.request
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from typing import NamedTuple
 
 try:
     import yaml
@@ -68,8 +80,8 @@ MANAGER_FILE = VARS_DIR / "container-images-manager-stable.yml"
 OPENSTACK_FILE = VARS_DIR / "container-images-openstack-stable.yml"
 
 # Image name in container-images-manager-stable.yml -> key in the docker_images
-# section of the release. Images not listed here are not pinned by the release
-# and are left untouched.
+# section of the release. Images not listed here have no counterpart in the
+# release and are left untouched.
 MANAGER_IMAGES = {
     "images_manager_stable_external": {
         "hashicorp/vault": "vault",
@@ -94,7 +106,8 @@ MANAGER_IMAGES = {
         "inventory-reconciler": "inventory_reconciler",
         "kolla-ansible": "kolla_ansible",
         "netbox": "netbox",
-        # openstackclient is taken from latest/openstack-<version>.yml
+        # openstackclient is taken from latest/openstack-<version>.yml unless
+        # base.yml pins it
         "openstackclient": "openstackclient",
         "osism": "osism",
         "osism-ansible": "osism_ansible",
@@ -107,6 +120,10 @@ MANAGER_IMAGES = {
 }
 
 RELEASE_VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
+# The vars files are rewritten line by line to keep comments and blank lines,
+# so their entries are located with these two expressions. They only know
+# plain "  - image:tag" items; scan_file() compares what they find with what
+# the YAML parser sees, so anything else fails loudly instead of being skipped.
 LIST_RE = re.compile(r"^(?P<name>[A-Za-z_][A-Za-z0-9_]*):\s*$")
 ITEM_RE = re.compile(r"^(?P<prefix>\s*-\s+)(?P<image>\S+)\s*$")
 KOLLA_ENTRY_RE = re.compile(
@@ -119,6 +136,45 @@ SBOM_IMAGE_RE = re.compile(
 
 class Fatal(Exception):
     pass
+
+
+class Entry(NamedTuple):
+    """One list item of a vars file."""
+
+    index: int  # line index in the file
+    list_name: str
+    image: str
+
+
+class Resolution(NamedTuple):
+    """What the release says about one list entry."""
+
+    image: str | None = None  # the entry as pinned by the release
+    reason: str | None = None  # why the entry is kept when image is None
+    expected: bool = True  # False: the mapping or the release is inconsistent
+
+
+def resolved(image):
+    return Resolution(image=image)
+
+
+def unmapped(reason):
+    """The entry has no counterpart in the release; keeping it is normal."""
+    return Resolution(reason=reason)
+
+
+def unresolved(reason):
+    """The entry should have a counterpart, but it could not be found."""
+    return Resolution(reason=reason, expected=False)
+
+
+class Update(NamedTuple):
+    """The rewritten content of a vars file and the tally of its entries."""
+
+    path: Path
+    text: str
+    updated: int
+    unresolved: int
 
 
 def warn(message):
@@ -171,22 +227,6 @@ def latest_release():
     return max(versions, key=lambda v: tuple(int(part) for part in v.split(".")))
 
 
-def default_openstack_version():
-    # latest/openstack.yml is a symlink; raw.githubusercontent.com serves the
-    # link target as content. Fall back to the file content in case that
-    # changes.
-    text = fetch(f"{RELEASE_RAW}/latest/openstack.yml").strip()
-    match = re.fullmatch(r"openstack-(.+)\.yml", text)
-    if match:
-        return match.group(1)
-    version = load_yaml(text).get("openstack_version")
-    if not version:
-        raise Fatal(
-            f"cannot determine the default OpenStack version from latest/openstack.yml: {text!r}"
-        )
-    return version
-
-
 def release_versions(release, openstack_version):
     """Return the docker_images of the release plus openstackclient."""
     base = load_yaml(
@@ -208,11 +248,15 @@ def release_versions(release, openstack_version):
             ),
         )
     )
+    # A pin in base.yml is release-scoped and wins; latest/ only fills the gap.
     openstackclient = (openstack.get("docker_images") or {}).get("openstackclient")
     if openstackclient:
-        versions["openstackclient"] = openstackclient
-    else:
-        warn(f"latest/openstack-{openstack_version}.yml pins no openstackclient tag")
+        versions.setdefault("openstackclient", openstackclient)
+    elif "openstackclient" not in versions:
+        warn(
+            f"neither {release}/base.yml nor latest/openstack-{openstack_version}.yml "
+            "pins an openstackclient tag"
+        )
     return versions
 
 
@@ -235,10 +279,13 @@ def sbom_via_docker(image):
 def sbom_via_crane(image):
     result = run(["crane", "--platform", "linux/amd64", "export", image, "-"])
     with tarfile.open(fileobj=io.BytesIO(result.stdout)) as tar:
-        member = tar.extractfile("images.yml")
-        if member is None:
-            raise Fatal(f"{image} contains no images.yml")
-        return member.read().decode()
+        # The member may be stored as images.yml, ./images.yml or /images.yml.
+        for member in tar:
+            if member.isfile() and PurePosixPath("/", member.name) == PurePosixPath(
+                "/images.yml"
+            ):
+                return tar.extractfile(member).read().decode()
+    raise Fatal(f"{image} contains no images.yml")
 
 
 def sbom_tags(image, openstack_version):
@@ -283,16 +330,16 @@ def resolve_manager(versions):
     def resolve(list_name, image):
         mapping = MANAGER_IMAGES.get(list_name)
         if mapping is None:
-            return None, f"unknown list {list_name}"
-        name, _, tag = image.rpartition(":")
+            return unresolved(f"unknown list {list_name}")
+        name, _, _ = image.rpartition(":")
         if not name:
-            return None, "entry has no tag"
+            return unresolved("entry has no tag")
         key = mapping.get(name)
         if key is None:
-            return None, "not pinned by the release"
+            return unmapped("no mapping in MANAGER_IMAGES")
         if key not in versions:
-            return None, f"docker_images.{key} missing in the release"
-        return f"{name}:{versions[key]}", None
+            return unresolved(f"docker_images.{key} missing in the release")
+        return resolved(f"{name}:{versions[key]}")
 
     return resolve
 
@@ -300,77 +347,177 @@ def resolve_manager(versions):
 def resolve_openstack(openstack_version, tags, sbom_image):
     def resolve(list_name, image):
         if list_name != "images_kolla":
-            return None, f"unknown list {list_name}"
+            return unresolved(f"unknown list {list_name}")
         match = KOLLA_ENTRY_RE.match(image)
         if not match:
-            return None, "not a release/<version>/<name>:<tag> entry"
+            return unresolved("not a release/<version>/<name>:<tag> entry")
         tag = tags.get(match["name"])
         if tag is None:
-            return None, f"not part of {sbom_image}"
-        return f"release/{openstack_version}/{match['name']}:{tag}", None
+            return unresolved(f"not part of {sbom_image}")
+        return resolved(f"release/{openstack_version}/{match['name']}:{tag}")
 
     return resolve
 
 
-def update_file(path, resolve, dry_run, verbose):
-    """Rewrite the list entries of a vars file. Returns (changed, unresolved)."""
-    lines = path.read_text().splitlines(keepends=True)
-    entries = []  # (index, list name, image)
+def scan_file(path):
+    """Return (lines, entries) of a vars file.
+
+    Every entry the YAML parser sees must be found by the line scanner as
+    well; an entry written any other way (quoted, followed by a comment, in
+    flow style) would otherwise be invisible to the update.
+    """
+    try:
+        text = path.read_text()
+    except OSError as e:
+        raise Fatal(f"{path}: {e}") from e
+    lines = text.splitlines(keepends=True)
+
+    entries = []
+    scanned = {}
     current = None
     for index, line in enumerate(lines):
         match = LIST_RE.match(line)
         if match:
             current = match["name"]
+            scanned.setdefault(current, [])
             continue
         match = ITEM_RE.match(line)
-        if match and current:
-            entries.append((index, current, match["image"]))
+        if match and current is not None:
+            entries.append(Entry(index, current, match["image"]))
+            scanned[current].append(match["image"])
 
+    try:
+        parsed = load_yaml(text)
+    except yaml.YAMLError as e:
+        raise Fatal(f"{path.name}: {e}") from e
+    if not isinstance(parsed, dict):
+        raise Fatal(f"{path.name}: expected a mapping of lists")
+    lists = {name: value for name, value in parsed.items() if isinstance(value, list)}
+    for name in sorted(set(scanned) | set(lists)):
+        found, expected = scanned.get(name, []), lists.get(name, [])
+        if found == expected:
+            continue
+        if len(found) != len(expected):
+            detail = (
+                f"the YAML parser sees {len(expected)} entries, "
+                f"the line scanner {len(found)}"
+            )
+        else:
+            item, value = next((f, e) for f, e in zip(found, expected) if f != e)
+            detail = (
+                f"the line scanner reads {item!r} where the YAML parser reads {value!r}"
+            )
+        raise Fatal(
+            f"{path.name}: {name}: {detail}; every entry must be a plain "
+            "'  - image:tag' line without quotes or a trailing comment"
+        )
+    return lines, entries
+
+
+def kolla_versions(entries):
+    """Return the OpenStack releases the release/<version>/ entries point to."""
+    versions = set()
+    for entry in entries:
+        if entry.list_name == "images_kolla":
+            match = KOLLA_ENTRY_RE.match(entry.image)
+            if match:
+                versions.add(match["version"])
+    return versions
+
+
+def update_entries(path, lines, entries, resolve, verbose):
+    """Resolve every entry of a vars file; returns the new text and tally."""
     print(path.relative_to(REPO_ROOT))
     if not entries:
         warn(f"{path.name}: no list entries found")
-        return False, 0
+        return Update(path, "".join(lines), 0, 0)
 
-    width = max(len(image.rpartition(":")[0] or image) for _, _, image in entries)
+    lines = list(lines)
+    width = max(len(entry.image.rpartition(":")[0] or entry.image) for entry in entries)
     updated = unchanged = 0
     unresolved = []
-    for index, list_name, image in entries:
-        new_image, reason = resolve(list_name, image)
-        name, _, old_tag = image.rpartition(":")
-        if new_image is None:
-            # Expected for images the release does not know about; anything
-            # else means the mapping or the release is inconsistent.
-            if reason == "not pinned by the release":
-                print(f"  {name or image:<{width}}  {old_tag} (kept: {reason})")
-            else:
-                unresolved.append(f"{path.name}: {image}: {reason}")
-                print(f"  {name or image:<{width}}  {old_tag} (kept: {reason})")
+    for entry in entries:
+        result = resolve(entry.list_name, entry.image)
+        name, _, old_tag = entry.image.rpartition(":")
+        if result.image is None:
+            print(
+                f"  {name or entry.image:<{width}}  {old_tag} (kept: {result.reason})"
+            )
+            if not result.expected:
+                unresolved.append(f"{path.name}: {entry.image}: {result.reason}")
             continue
-        if new_image == image:
+        if result.image == entry.image:
             unchanged += 1
             if verbose:
                 print(f"  {name:<{width}}  {old_tag}")
             continue
         updated += 1
-        new_name, _, new_tag = new_image.rpartition(":")
+        new_name, _, new_tag = result.image.rpartition(":")
         print(
-            f"  {name:<{width}}  {old_tag} -> {new_tag if new_name == name else new_image}"
+            f"  {name:<{width}}  {old_tag} -> "
+            f"{new_tag if new_name == name else result.image}"
         )
-        prefix = ITEM_RE.match(lines[index])["prefix"]
-        lines[index] = f"{prefix}{new_image}\n"
+        prefix = ITEM_RE.match(lines[entry.index])["prefix"]
+        lines[entry.index] = f"{prefix}{result.image}\n"
 
-    print(
-        f"  {updated} updated, {unchanged} unchanged, {len(entries) - updated - unchanged} kept"
-    )
+    kept = len(entries) - updated - unchanged
+    print(f"  {updated} updated, {unchanged} unchanged, {kept} kept")
     for message in unresolved:
         warn(message)
-
-    if updated and not dry_run:
-        path.write_text("".join(lines))
-    return updated > 0, len(unresolved)
+    return Update(path, "".join(lines), updated, len(unresolved))
 
 
-def parse_args():
+def report_unlisted(versions, tags, manager_entries, openstack_entries, verbose):
+    """Report the images of the release that the files do not list.
+
+    The files decide what the stable tarball contains, and that choice was
+    made by hand once. This is the reminder to look at it again when a
+    release adds images; the script itself never adds entries.
+    """
+    listed = set()
+    for entry in manager_entries:
+        mapping = MANAGER_IMAGES.get(entry.list_name, {})
+        listed.add(mapping.get(entry.image.rpartition(":")[0]))
+    # kolla names the SBOM image itself, not an image of the tarball
+    manager_unlisted = sorted(set(versions) - listed - {"kolla"})
+
+    listed = set()
+    for entry in openstack_entries:
+        match = KOLLA_ENTRY_RE.match(entry.image)
+        if entry.list_name == "images_kolla" and match:
+            listed.add(match["name"])
+    kolla_unlisted = sorted(set(tags) - listed)
+
+    for names, what, path in (
+        (manager_unlisted, "docker_images of the release", MANAGER_FILE),
+        (kolla_unlisted, "images of the SBOM", OPENSTACK_FILE),
+    ):
+        print(f"{len(names)} {what} are not listed in {path.name}")
+        if verbose:
+            for name in names:
+                print(f"  {name}")
+
+
+def write_file(path, text):
+    """Replace path atomically: stage the content next to it, then rename."""
+    try:
+        fd, staged = tempfile.mkstemp(
+            dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"
+        )
+    except OSError as e:
+        raise Fatal(f"{path}: {e}") from e
+    try:
+        with os.fdopen(fd, "w") as stream:
+            stream.write(text)
+        shutil.copymode(path, staged)
+        os.replace(staged, path)
+    except OSError as e:
+        with contextlib.suppress(OSError):
+            os.unlink(staged)
+        raise Fatal(f"{path}: {e}") from e
+
+
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description="Update zuul/vars/container-images-*-stable.yml from an OSISM release.",
         epilog="Without RELEASE the highest numbered X.Y.Z release of osism/release is used.",
@@ -382,7 +529,10 @@ def parse_args():
         "-o",
         "--openstack-version",
         metavar="VERSION",
-        help="OpenStack release of the SBOM image (default: latest/openstack.yml of osism/release)",
+        help=(
+            "move the kolla entries to this OpenStack release "
+            "(default: keep the release they currently use)"
+        ),
     )
     parser.add_argument(
         "-n",
@@ -391,20 +541,40 @@ def parse_args():
         help="report the changes without writing the files",
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true", help="also report unchanged entries"
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="also report unchanged entries and name the unlisted images of the release",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main():
-    args = parse_args()
+def main(argv=None):
+    args = parse_args(argv)
 
-    for path in (MANAGER_FILE, OPENSTACK_FILE):
-        if not path.is_file():
-            raise Fatal(f"{path} not found")
+    manager_lines, manager_entries = scan_file(MANAGER_FILE)
+    openstack_lines, openstack_entries = scan_file(OPENSTACK_FILE)
+
+    # The OpenStack release of the kolla entries is a property of the file;
+    # moving the entries to another release needs an explicit -o.
+    file_versions = kolla_versions(openstack_entries)
+    if args.openstack_version:
+        openstack_version = args.openstack_version
+    elif len(file_versions) == 1:
+        (openstack_version,) = file_versions
+    elif file_versions:
+        raise Fatal(
+            f"{OPENSTACK_FILE.name}: the entries belong to different OpenStack "
+            f"releases ({', '.join(sorted(file_versions))}); pass -o to move "
+            "them all to one release"
+        )
+    else:
+        raise Fatal(
+            f"{OPENSTACK_FILE.name}: no release/<version>/<name>:<tag> entries "
+            "found; pass -o to select the OpenStack release"
+        )
 
     release = args.release or latest_release()
-    openstack_version = args.openstack_version or default_openstack_version()
     versions = release_versions(release, openstack_version)
     kolla_version = versions["kolla"]
     sbom_image = f"{REGISTRY}/kolla/release/{openstack_version}/sbom:{kolla_version}"
@@ -412,26 +582,41 @@ def main():
     print(
         f"OSISM release {release}: kolla {kolla_version}, OpenStack {openstack_version}"
     )
+    if file_versions - {openstack_version}:
+        print(
+            f"Moving the kolla entries from release/{'|'.join(sorted(file_versions))}/ "
+            f"to release/{openstack_version}/"
+        )
     print(f"SBOM image: {sbom_image}")
     tags = sbom_tags(sbom_image, openstack_version)
     print()
 
-    changed = False
-    unresolved = 0
-    for path, resolve in (
-        (MANAGER_FILE, resolve_manager(versions)),
-        (OPENSTACK_FILE, resolve_openstack(openstack_version, tags, sbom_image)),
+    updates = []
+    for path, lines, entries, resolve in (
+        (MANAGER_FILE, manager_lines, manager_entries, resolve_manager(versions)),
+        (
+            OPENSTACK_FILE,
+            openstack_lines,
+            openstack_entries,
+            resolve_openstack(openstack_version, tags, sbom_image),
+        ),
     ):
-        file_changed, file_unresolved = update_file(
-            path, resolve, args.dry_run, args.verbose
-        )
-        changed = changed or file_changed
-        unresolved += file_unresolved
+        updates.append(update_entries(path, lines, entries, resolve, args.verbose))
         print()
+    report_unlisted(versions, tags, manager_entries, openstack_entries, args.verbose)
+    print()
 
+    updated = sum(update.updated for update in updates)
+    unresolved = sum(update.unresolved for update in updates)
     if args.dry_run:
-        print("Dry run, nothing written.")
-    elif changed:
+        if updated:
+            print(f"Dry run: {updated} changes pending, nothing written.")
+        else:
+            print("Dry run: the files already match the release, nothing to write.")
+    elif updated:
+        for update in updates:
+            if update.updated:
+                write_file(update.path, update.text)
         print("Files updated. Review the result with: git diff zuul/vars")
     else:
         print("Nothing to do, the files already match the release.")

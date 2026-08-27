@@ -132,6 +132,15 @@
       openstack_version: "stable"
 
 - job:
+    name: metalbox-unittest
+    description: Run the unit tests of the Python scripts in zuul/.
+    nodeset: ubuntu-noble
+    run: zuul/unittest.yml
+    files:
+      - "^zuul/.*\\.py$"
+      - "^zuul/unittest.yml"
+
+- job:
     name: metalbox-mirror-octavia-image
     nodeset: ubuntu-noble-large
     pre-run: zuul/pre-mirror-octavia-image.yml
@@ -239,7 +248,9 @@
         - metalbox-mirror-container-images-stable-full
         - metalbox-mirror-debian-packages
         - metalbox-mirror-octavia-image
+        - metalbox-unittest
         - ansible-lint
+        - python-black
         - yamllint
     periodic-midnight:
       jobs:
@@ -251,6 +262,8 @@
         - metalbox-mirror-container-images-2024.2-full-publish
         - metalbox-mirror-container-images-2025.1-full-publish
         - metalbox-mirror-container-images-stable-full-publish
+        - metalbox-unittest
+        - python-black
         - yamllint
     post:
       jobs:
