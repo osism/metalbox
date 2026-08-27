@@ -1,0 +1,17 @@
+---
+- name: Run unit tests
+  hosts: all
+
+  tasks:
+    - name: Install required packages
+      become: true
+      ansible.builtin.apt:
+        name:
+          - python3-yaml
+        update_cache: true
+
+    - name: Run unit tests
+      ansible.builtin.command:
+        cmd: python3 -m unittest discover --verbose --start-directory zuul
+        chdir: "{{ zuul.project.src_dir }}"
+      changed_when: false
