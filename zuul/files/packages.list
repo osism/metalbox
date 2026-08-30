@@ -1,12 +1,17 @@
 adduser
 adwaita-icon-theme
+aide
+aide-common
 amd64-microcode
 apparmor
+apparmor-profiles
+apparmor-utils
 appstream
 apt
 apt-transport-https
 apt-utils
 at-spi2-common
+audispd-plugins
 auditd
 base-files
 base-passwd
@@ -369,6 +374,7 @@ libpopt0
 libproc-processtable-perl
 libproc2-0
 libpsl5t64
+libpwquality-common
 libpython3-stdlib
 libpython3.12-minimal
 libpython3.12-stdlib
