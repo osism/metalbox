@@ -3,6 +3,11 @@ images_osism:
   - kolla-ansible:2025.1
   - openstackclient:2025.1
 
+  # The containers Ceph runs as; see the note in
+  # container-images-openstack-stable.yml.
+  - ceph-daemon:18.2.8
+  - cephclient:18.2.8
+
 images_kolla:
   - ceilometer-central:2025.1
   - ceilometer-compute:2025.1
