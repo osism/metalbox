@@ -1,4 +1,11 @@
 ---
+images_osism:
+  # The containers Ceph runs as. ceph-ansible -- the tool that deploys Ceph --
+  # is already mirrored via container-images-manager-stable.yml, but these were
+  # not, so an air-gapped pod could install Ceph and then not start it.
+  - ceph-daemon:18.2.8
+  - cephclient:18.2.8
+
 images_kolla:
   - release/2025.1/ceilometer-central:24.0.1.20260814
   - release/2025.1/ceilometer-compute:24.0.1.20260814
