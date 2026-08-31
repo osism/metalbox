@@ -17,7 +17,6 @@ images_manager:
   - ara-server:1.7.2
   - ara-server:1.7.3
   - ara-server:1.7.5
-  - dnsdist:1.9.8
   - dnsmasq-osism:2.90
   - gnmic:0.41.0
   - inventory-reconciler:latest
@@ -30,7 +29,6 @@ images_manager:
   - osism:latest
   - rsync:latest
   - seed:latest
-  - tempest:latest
 
 images_kolla_metalbox:
   - cron:2024.2
