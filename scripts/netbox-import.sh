@@ -85,7 +85,7 @@ while read -r device mount_point; do
     if search_on_device "$device" "$mount_point" "yes"; then
         break
     fi
-done < <(findmnt -t ext4 -n -o SOURCE,TARGET)
+done < <(findmnt --list -t ext4 -n -o SOURCE,TARGET)
 
 # If not found, check all ext4 partitions (mounted and unmounted)
 if [[ -z "$FOUND_FILE" ]]; then
