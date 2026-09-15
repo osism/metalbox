@@ -75,6 +75,19 @@
         update_cache: true
       when: _publish | default(false) | bool
 
+    - name: Push the container image
+      ansible.builtin.shell:
+        executable: /bin/bash
+        cmd: |
+          set -e
+          set -o pipefail
+          set -x
+
+          version=$(date +%Y%m%d)
+          docker push "quay.io/osism-mirror/ubuntu-noble:$version"
+      when: _publish | default(false) | bool
+      changed_when: true
+
     - name: Write the rclone configuration with the object-storage credentials
       ansible.builtin.copy:
         dest: "{{ ansible_user_dir }}/.rclone.conf"
@@ -92,7 +105,7 @@
       when: _publish | default(false) | bool
       no_log: true
 
-    - name: Run push and upload script
+    - name: Run upload
       ansible.builtin.shell:
         executable: /bin/bash
         chdir: "{{ zuul.project.src_dir | default('.') }}"
@@ -100,9 +113,6 @@
           set -e
           set -o pipefail
           set -x
-
-          version=$(date +%Y%m%d)
-          docker push "quay.io/osism-mirror/ubuntu-noble:$version"
 
           # Upload the tarball before the checksum that describes it. Both
           # objects have fixed names, so the pair is briefly inconsistent
