@@ -60,6 +60,10 @@
     max: 1
 
 - semaphore:
+    name: semaphore-metalbox-mirror-container-images-2026.1-full-publish
+    max: 1
+
+- semaphore:
     name: semaphore-metalbox-mirror-container-images-stable-full-publish
     max: 1
 
@@ -93,6 +97,7 @@
       - "^zuul/vars/container-images-metalbox.yml"
       - "^zuul/vars/container-images-manager-stable.yml"
       - "^zuul/vars/container-images-openstack-2025.1.yml"
+      - "^zuul/vars/container-images-openstack-2026.1.yml"
       - "^zuul/vars/container-images-openstack-stable.yml"
       - "^zuul/image_refs.py"
       - "^zuul/check-container-image-tags.py"
@@ -119,6 +124,14 @@
     vars:
       full: true
       openstack_version: "2025.1"
+
+- job:
+    name: metalbox-mirror-container-images-2026.1-full
+    parent: metalbox-mirror-container-images
+    timeout: 7200
+    vars:
+      full: true
+      openstack_version: "2026.1"
 
 - job:
     name: metalbox-mirror-container-images-stable-full
@@ -152,6 +165,7 @@
       openstack_versions:
         - "2024.2"
         - "2025.1"
+        - "2026.1"
     files:
       - "^scripts/octavia-export.sh$"
       - "^zuul/mirror-octavia-image.yml"
@@ -199,6 +213,21 @@
         pass-to-parent: true
 
 - job:
+    name: metalbox-mirror-container-images-2026.1-full-publish
+    parent: metalbox-mirror-container-images
+    semaphores:
+      - name: semaphore-metalbox-mirror-container-images-2026.1-full-publish
+    timeout: 7200
+    vars:
+      full: true
+      publish: true
+      openstack_version: "2026.1"
+    secrets:
+      - name: secret
+        secret: SECRET_METALBOX
+        pass-to-parent: true
+
+- job:
     name: metalbox-mirror-container-images-stable-full-publish
     parent: metalbox-mirror-container-images
     semaphores:
@@ -232,6 +261,7 @@
       jobs:
         - metalbox-mirror-container-images-metalbox
         - metalbox-mirror-container-images-2025.1-full
+        - metalbox-mirror-container-images-2026.1-full
         - metalbox-mirror-container-images-stable-full
         - metalbox-mirror-debian-packages
         - metalbox-mirror-octavia-image
@@ -247,6 +277,7 @@
         - ansible-lint
         - metalbox-mirror-container-images-metalbox-publish
         - metalbox-mirror-container-images-2025.1-full-publish
+        - metalbox-mirror-container-images-2026.1-full-publish
         - metalbox-mirror-container-images-stable-full-publish
         - metalbox-unittest
         - python-black
@@ -256,6 +287,8 @@
         - metalbox-mirror-container-images-metalbox-publish:
             branches: main
         - metalbox-mirror-container-images-2025.1-full-publish:
+            branches: main
+        - metalbox-mirror-container-images-2026.1-full-publish:
             branches: main
         - metalbox-mirror-container-images-stable-full-publish:
             branches: main
