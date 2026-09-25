@@ -92,7 +92,7 @@ MANAGER_IMAGES = {
         "library/postgres": "postgres",
         "library/redis": "redis",
         "library/traefik": "traefik",
-        "otel/opentelemetry-collector": "opentelemetry_collector",
+        "otel/opentelemetry-collector-contrib": "opentelemetry_collector",
         "pgautoupgrade/pgautoupgrade": "pgautoupgrade",
         "smallstep/step-ca": "stepca",
         "ubuntu/squid": "squid",
