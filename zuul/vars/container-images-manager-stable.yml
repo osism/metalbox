@@ -11,7 +11,7 @@ images_manager_stable_external:
   - library/redis:7.4.10-alpine
   - library/registry:3.0
   - library/traefik:v3.7.10
-  - otel/opentelemetry-collector:0.158.0
+  - otel/opentelemetry-collector-contrib:0.158.0
   - pgautoupgrade/pgautoupgrade:16-alpine
   - smallstep/step-ca:0.30.2
   - ubuntu/squid:6.1-23.10_beta

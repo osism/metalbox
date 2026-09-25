@@ -404,5 +404,17 @@ class WriteFileTest(unittest.TestCase):
         self.assertEqual([p.name for p in self.tmp.iterdir()], ["vars.yml"])
 
 
+class ManagerImagesMappingTest(unittest.TestCase):
+    def test_otel_collector_is_the_contrib_image(self):
+        # osism/release etc/images.yml maps opentelemetry_collector to the
+        # -contrib repository; that is the image OSISM deploys.
+        external = script.MANAGER_IMAGES["images_manager_stable_external"]
+        self.assertEqual(
+            external.get("otel/opentelemetry-collector-contrib"),
+            "opentelemetry_collector",
+        )
+        self.assertNotIn("otel/opentelemetry-collector", external)
+
+
 if __name__ == "__main__":
     unittest.main()
