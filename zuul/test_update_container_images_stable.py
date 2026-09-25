@@ -415,6 +415,13 @@ class ManagerImagesMappingTest(unittest.TestCase):
         )
         self.assertNotIn("otel/opentelemetry-collector", external)
 
+    def test_phpmyadmin_is_the_release_repository(self):
+        # osism/release etc/images.yml maps phpmyadmin to phpmyadmin/phpmyadmin,
+        # not the Docker Hub library image.
+        external = script.MANAGER_IMAGES["images_manager_stable_external"]
+        self.assertEqual(external.get("phpmyadmin/phpmyadmin"), "phpmyadmin")
+        self.assertNotIn("library/phpmyadmin", external)
+
 
 if __name__ == "__main__":
     unittest.main()
