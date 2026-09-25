@@ -56,10 +56,6 @@
     max: 1
 
 - semaphore:
-    name: semaphore-metalbox-mirror-container-images-2024.2-full-publish
-    max: 1
-
-- semaphore:
     name: semaphore-metalbox-mirror-container-images-2025.1-full-publish
     max: 1
 
@@ -96,7 +92,6 @@
       - "^zuul/pre-mirror-container-images.yml"
       - "^zuul/vars/container-images-metalbox.yml"
       - "^zuul/vars/container-images-manager-stable.yml"
-      - "^zuul/vars/container-images-openstack-2024.2.yml"
       - "^zuul/vars/container-images-openstack-2025.1.yml"
       - "^zuul/vars/container-images-openstack-stable.yml"
 
@@ -106,14 +101,6 @@
     timeout: 7200
     vars:
       full: false
-
-- job:
-    name: metalbox-mirror-container-images-2024.2-full
-    parent: metalbox-mirror-container-images
-    timeout: 7200
-    vars:
-      full: true
-      openstack_version: "2024.2"
 
 - job:
     name: metalbox-mirror-container-images-2025.1-full
@@ -181,21 +168,6 @@
         pass-to-parent: true
 
 - job:
-    name: metalbox-mirror-container-images-2024.2-full-publish
-    parent: metalbox-mirror-container-images
-    semaphores:
-      - name: semaphore-metalbox-mirror-container-images-2024.2-full-publish
-    timeout: 7200
-    vars:
-      full: true
-      publish: true
-      openstack_version: "2024.2"
-    secrets:
-      - name: secret
-        secret: SECRET_METALBOX
-        pass-to-parent: true
-
-- job:
     name: metalbox-mirror-container-images-2025.1-full-publish
     parent: metalbox-mirror-container-images
     semaphores:
@@ -243,7 +215,6 @@
     check:
       jobs:
         - metalbox-mirror-container-images-metalbox
-        - metalbox-mirror-container-images-2024.2-full
         - metalbox-mirror-container-images-2025.1-full
         - metalbox-mirror-container-images-stable-full
         - metalbox-mirror-debian-packages
@@ -259,7 +230,6 @@
       jobs:
         - ansible-lint
         - metalbox-mirror-container-images-metalbox-publish
-        - metalbox-mirror-container-images-2024.2-full-publish
         - metalbox-mirror-container-images-2025.1-full-publish
         - metalbox-mirror-container-images-stable-full-publish
         - metalbox-unittest
@@ -268,8 +238,6 @@
     post:
       jobs:
         - metalbox-mirror-container-images-metalbox-publish:
-            branches: main
-        - metalbox-mirror-container-images-2024.2-full-publish:
             branches: main
         - metalbox-mirror-container-images-2025.1-full-publish:
             branches: main
