@@ -138,6 +138,8 @@ grub-common
 grub-efi
 grub-efi-amd64
 grub-efi-amd64-bin
+grub-efi-amd64-signed
+grub-pc
 grub-pc-bin
 grub2-common
 gtk-update-icon-cache
@@ -205,6 +207,7 @@ libbsd0
 libbz2-1.0
 libc-bin
 libc6
+libc6-dev
 libcairo-gobject2
 libcairo2
 libcap-ng0
@@ -640,6 +643,7 @@ sg3-utils
 sg3-utils-udev
 sgml-base
 shared-mime-info
+shim-signed
 skopeo
 smartmontools
 socat
