@@ -94,6 +94,16 @@
       - "^zuul/vars/container-images-manager-stable.yml"
       - "^zuul/vars/container-images-openstack-2025.1.yml"
       - "^zuul/vars/container-images-openstack-stable.yml"
+      - "^zuul/image_refs.py"
+      - "^zuul/check-container-image-tags.py"
+      - "^zuul/check-box-images.py"
+      - "^zuul/box-images-not-deployed.yml"
+      - "^environments/images.yml"
+      - "^environments/configuration.yml"
+      - "^environments/manager/images.yml"
+      - "^environments/manager/configuration.yml"
+      - "^environments/manager/group_vars/"
+      - "^environments/manager/host_vars/"
 
 - job:
     name: metalbox-mirror-container-images-metalbox
@@ -125,7 +135,13 @@
     run: zuul/unittest.yml
     files:
       - "^zuul/.*\\.py$"
-      - "^zuul/unittest.yml"
+      - "^zuul/.*\\.yml$"
+      - "^environments/images.yml"
+      - "^environments/configuration.yml"
+      - "^environments/manager/images.yml"
+      - "^environments/manager/configuration.yml"
+      - "^environments/manager/group_vars/"
+      - "^environments/manager/host_vars/"
 
 - job:
     name: metalbox-mirror-octavia-image
