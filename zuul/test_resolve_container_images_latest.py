@@ -3,7 +3,11 @@
 Run with: python3 -m unittest discover -s zuul
 """
 
+import contextlib
 import importlib.util
+import io
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -388,6 +392,207 @@ class VarsListsTest(unittest.TestCase):
         self.assertNotIn(
             "osism/ara-server:1.8.0-r1", lists["images_manager_latest_external"]
         )
+
+
+DIGESTS = {
+    "osism-ansible": "sha256:" + "a" * 64,
+    "ceph-ansible": "sha256:" + "b" * 64,
+    "kolla-ansible": "sha256:" + "c" * 64,
+}
+COMMIT = "0123456789abcdef0123456789abcdef01234567"
+
+
+class MainTest(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.tmp = Path(tmp.name)
+        runners = self.tmp / "runners"
+        for name, files in {
+            "osism-ansible": {"versions.yml": RUNNER_VERSIONS},
+            "ceph-ansible": {"versions.yml": CEPH_VERSIONS},
+            "kolla-ansible": {"versions.yml": KOLLA_VERSIONS},
+        }.items():
+            (runners / name).mkdir(parents=True)
+            (runners / name / "digest").write_text(DIGESTS[name] + "\n")
+            for filename, text in files.items():
+                (runners / name / filename).write_text(text)
+        for (collection, role), text in ROLE_DEFAULTS.items():
+            path = runners / "osism-ansible" / collection / "roles" / role / "defaults"
+            path.mkdir(parents=True)
+            (path / "main.yml").write_text(text)
+        (self.tmp / "manager-stable.yml").write_text(MANAGER_STABLE)
+        self.output = self.tmp / "out" / "vars.yml"
+        self.manifest = self.tmp / "out" / "manifest.yml"
+        self.output.parent.mkdir()
+
+    def run_main(self, commit_of=None, render=None):
+        def default_commit():
+            return COMMIT
+
+        def default_render(commit, workdir):
+            return load_yaml(GENERICS), "v0.20260909.0"
+
+        commit_of = commit_of or default_commit
+        render = render or default_render
+        argv = [
+            "--openstack-version",
+            "2025.1",
+            "--ceph-version",
+            "reef",
+            "--runner-images",
+            str(self.tmp / "runners"),
+            "--output",
+            str(self.output),
+            "--manifest",
+            str(self.manifest),
+            "--manager-stable",
+            str(self.tmp / "manager-stable.yml"),
+        ]
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            status = resolver.main(argv, commit_of=commit_of, render=render)
+        return status, out.getvalue(), err.getvalue()
+
+    def test_writes_vars_and_manifest(self):
+        status, out, _ = self.run_main()
+        self.assertEqual(status, 0)
+        lists = load_yaml(self.output.read_text())
+        self.assertEqual(
+            lists["images_ceph_latest"], ["ceph-daemon:reef", "cephclient:reef"]
+        )
+        manifest = load_yaml(self.manifest.read_text())
+        self.assertEqual(manifest["release_commit"], COMMIT)
+        self.assertEqual(manifest["generics_version"], "v0.20260909.0")
+        self.assertEqual(manifest["openstack_version"], "2025.1")
+        self.assertEqual(manifest["runners"], DIGESTS)
+        self.assertIn(
+            {"image": "osism/ara-server:1.8.0-r1", "source": "generics"},
+            manifest["images"],
+        )
+        self.assertIn("generics-only", out)
+        self.assertIn("runner         smallstep/step-ca:0.30.2", out)
+
+    def test_render_receives_the_pinned_commit(self):
+        seen = []
+
+        def render(commit, workdir):
+            seen.append(commit)
+            return load_yaml(GENERICS), "v0.20260909.0"
+
+        self.run_main(render=render)
+        self.assertEqual(seen, [COMMIT])
+
+    def test_missing_role_defaults_fail_without_writing(self):
+        (
+            self.tmp
+            / "runners"
+            / "osism-ansible"
+            / "services"
+            / "roles"
+            / "squid"
+            / "defaults"
+            / "main.yml"
+        ).unlink()
+        status, _, err = self.run_main()
+        self.assertEqual(status, 1)
+        self.assertIn("osism.services.squid", err)
+        self.assertFalse(self.output.exists())
+
+    def test_missing_digest_fails_without_writing(self):
+        (self.tmp / "runners" / "ceph-ansible" / "digest").unlink()
+        status, _, err = self.run_main()
+        self.assertEqual(status, 1)
+        self.assertIn("ceph-ansible", err)
+        self.assertFalse(self.output.exists())
+        self.assertFalse(self.manifest.exists())
+
+    def test_unresolved_fails_without_writing(self):
+        (self.tmp / "manager-stable.yml").write_text(
+            MANAGER_STABLE.replace(
+                "  - library/httpd:alpine\n",
+                "  - otel/opentelemetry-collector:0.158.0\n",
+            )
+        )
+        status, _, err = self.run_main()
+        self.assertEqual(status, 1)
+        self.assertIn("otel/opentelemetry-collector:0.158.0", err)
+        self.assertFalse(self.output.exists())
+
+    def test_fetch_failure_fails_without_writing(self):
+        def render(commit, workdir):
+            raise resolver.Fatal("https://raw.githubusercontent.com/...: HTTP 503")
+
+        status, _, err = self.run_main(render=render)
+        self.assertEqual(status, 1)
+        self.assertIn("HTTP 503", err)
+        self.assertFalse(self.output.exists())
+
+
+class ReleaseCommitTest(unittest.TestCase):
+    def fake_run(self, stdout, returncode=0):
+        def run(cmd, **kwargs):
+            if returncode:
+                raise subprocess.CalledProcessError(returncode, cmd, stderr="fatal")
+            return subprocess.CompletedProcess(cmd, 0, stdout=stdout, stderr="")
+
+        return run
+
+    def test_parses_ls_remote(self):
+        run = self.fake_run(f"{COMMIT}\trefs/heads/main\n")
+        self.assertEqual(resolver.release_commit(run=run), COMMIT)
+
+    def test_empty_output_is_fatal(self):
+        with self.assertRaises(resolver.Fatal):
+            resolver.release_commit(run=self.fake_run(""))
+
+    def test_git_failure_is_fatal(self):
+        with self.assertRaises(resolver.Fatal):
+            resolver.release_commit(run=self.fake_run("", returncode=128))
+
+
+class RenderGenericsTest(unittest.TestCase):
+    def test_fetches_at_generics_version_and_pins_urls(self):
+        fetched = []
+        calls = []
+
+        def fetch(url):
+            fetched.append(url)
+            if url.endswith("/latest/base.yml"):
+                return "---\ngenerics_version: v0.20260909.0\n"
+            return "# content of " + url + "\n"
+
+        def run(cmd, cwd, env, **kwargs):
+            calls.append(env)
+            Path(cwd, env["IMAGES_PATH"]).write_text("---\nx_tag: '1'\n")
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            rendered, version = resolver.render_generics(
+                COMMIT, Path(tmp), fetch=fetch, run=run
+            )
+            template = Path(tmp, "images.yml.j2").read_text()
+        self.assertEqual(version, "v0.20260909.0")
+        self.assertEqual(rendered, {"x_tag": "1"})
+        self.assertIn(
+            "/osism/generics/v0.20260909.0/environments/manager/images.yml", template
+        )
+        self.assertTrue(
+            any(
+                u.endswith("/osism/generics/v0.20260909.0/src/render-images.py")
+                for u in fetched
+            )
+        )
+        env = calls[0]
+        self.assertEqual(env["MANAGER_VERSION"], "latest")
+        self.assertIn(f"/osism/release/{COMMIT}/latest/base.yml", env["VERSIONS_URL"])
+        self.assertIn(f"/osism/release/{COMMIT}/etc/images.yml", env["IMAGES_URL"])
+
+    def test_missing_generics_version_is_fatal(self):
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaises(resolver.Fatal):
+            resolver.render_generics(
+                COMMIT, Path(tmp), fetch=lambda url: "---\n", run=None
+            )
 
 
 if __name__ == "__main__":
