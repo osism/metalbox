@@ -129,6 +129,7 @@
           python3 zuul/check-container-image-tags.py
           --source-registry {{ docker_registry }}
           {% for item in _image_lists %}zuul/vars/{{ item }} {% endfor %}
+          {{ _latest_vars if _latest | bool else '' }}
       changed_when: false
 
     - name: Copy manager external images
