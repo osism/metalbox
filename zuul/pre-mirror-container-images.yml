@@ -9,6 +9,7 @@
         name:
           - python3-docker
           - python3-requests
+          - python3-yaml
           - skopeo
 
   roles:
