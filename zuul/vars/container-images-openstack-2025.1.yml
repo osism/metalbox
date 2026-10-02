@@ -9,6 +9,9 @@ images_osism:
   - cephclient:18.2.8
 
 images_kolla:
+  - barbican-api:2025.1
+  - barbican-keystone-listener:2025.1
+  - barbican-worker:2025.1
   - ceilometer-central:2025.1
   - ceilometer-compute:2025.1
   - ceilometer-notification:2025.1
