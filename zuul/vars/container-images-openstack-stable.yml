@@ -7,6 +7,9 @@ images_osism:
   - cephclient:18.2.8
 
 images_kolla:
+  - release/2025.1/barbican-api:20.0.1.20260814
+  - release/2025.1/barbican-keystone-listener:20.0.1.20260814
+  - release/2025.1/barbican-worker:20.0.1.20260814
   - release/2025.1/ceilometer-central:24.0.1.20260814
   - release/2025.1/ceilometer-compute:24.0.1.20260814
   - release/2025.1/ceilometer-notification:24.0.1.20260814
