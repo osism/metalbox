@@ -87,7 +87,6 @@ MANAGER_IMAGES = {
         "hashicorp/vault": "vault",
         "library/adminer": "adminer",
         "library/mariadb": "mariadb",
-        "library/memcached": "memcached",
         "library/postgres": "postgres",
         "library/redis": "redis",
         "library/traefik": "traefik",
