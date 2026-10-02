@@ -8,6 +8,7 @@
       ansible.builtin.apt:
         name:
           - python3-docker
+          - python3-jinja2
           - python3-requests
           - python3-yaml
           - skopeo

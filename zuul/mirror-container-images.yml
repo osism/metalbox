@@ -95,6 +95,12 @@
         - _full | bool
         - _openstack_version == "stable"
 
+    - name: Check that the box can pull every image it deploys
+      ansible.builtin.command:
+        chdir: "{{ zuul.project.src_dir }}"
+        cmd: python3 zuul/check-box-images.py --registry localhost:5000 --configuration .
+      changed_when: false
+
     - name: Stop local container registry
       community.docker.docker_container:
         name: registry
