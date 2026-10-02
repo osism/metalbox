@@ -1,0 +1,40 @@
+---
+# Images the MetalBox's own environments/manager/images.yml renders but a
+# MetalBox never pulls, so zuul/check-box-images.py does not require them in
+# the mirrored registry.
+#
+# Each row needs evidence a reviewer can check; "probably unused" is not
+# enough, because a wrong row turns an air-gap failure into a silent pass.
+# A row with `unless: <flag>` applies only while that flag is false in the
+# merged configuration: turning the service on makes its image required.
+
+vault_image:
+  reason: enable_vault is false in environments/manager/configuration.yml
+  unless: enable_vault
+ceph_ansible_image:
+  reason: enable_ceph_ansible is false in environments/manager/configuration.yml
+  unless: enable_ceph_ansible
+osism_kubernetes_image:
+  reason: enable_osism_kubernetes is false in environments/manager/configuration.yml
+  unless: enable_osism_kubernetes
+traefik_image:
+  reason: osism-frontend serves the frontend; traefik is not started
+# Self-expiring: not a fact about what a MetalBox runs but an artefact of a
+# stale render. The osism-netbox image was folded into the generic osism image
+# (ansible-collection-services#1775), and generics and osism/release have
+# dropped the variable. It survives because gilt.yml pins generics at
+# v0.20251121.0, when images.yml was last rendered. Once a re-render drops it,
+# test_box_images_not_deployed fails and says to delete this row.
+osism_netbox_image:
+  reason: orphan of a stale render; see the note above
+adminer_image:
+  reason: not referenced by the manager role; rendered generically
+phpmyadmin_image:
+  reason: not referenced by the manager role; rendered generically
+registry_image:
+  reason: >-
+    dead variable; the registry is started from the image baked in at
+    elements/metalbox/install.d/40-install in openstack-ironic-images, not
+    pulled from the mirror
+nginx_image:
+  reason: dead variable; deleted from generics, consumed by nothing
