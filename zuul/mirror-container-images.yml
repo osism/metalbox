@@ -10,19 +10,17 @@
     _openstack_version: "{{ openstack_version | default('') }}"
     _tarball_name: "{{ 'registry-' ~ _openstack_version ~ '-full.tar.bz2' if _full | bool else 'registry.tar.bz2' }}"
 
+    # The image-list vars files this job copies; loaded below and checked
+    # before the first copy, so both read the same list.
+    _image_lists: >-
+      {{ ['container-images-metalbox.yml']
+         + (['container-images-openstack-' ~ _openstack_version ~ '.yml'] if _full | bool else [])
+         + (['container-images-manager-stable.yml'] if (_full | bool and _openstack_version == 'stable') else []) }}
+
   tasks:
-    - name: Load metalbox image list
-      ansible.builtin.include_vars: vars/container-images-metalbox.yml
-
-    - name: Load openstack image list
-      ansible.builtin.include_vars: "vars/container-images-openstack-{{ _openstack_version }}.yml"
-      when: _full | bool
-
-    - name: Load manager-stable image list
-      ansible.builtin.include_vars: vars/container-images-manager-stable.yml
-      when:
-        - _full | bool
-        - _openstack_version == "stable"
+    - name: Load the image lists
+      ansible.builtin.include_vars: "vars/{{ item }}"
+      loop: "{{ _image_lists }}"
 
     - name: Create registry volume
       community.docker.docker_volume:
@@ -37,6 +35,15 @@
           - "5000:5000"
         volumes:
           - registry:/var/lib/registry
+
+    - name: Check that every image to copy resolves at its source
+      ansible.builtin.command:
+        chdir: "{{ zuul.project.src_dir }}"
+        cmd: >-
+          python3 zuul/check-container-image-tags.py
+          --source-registry {{ docker_registry }}
+          {% for item in _image_lists %}zuul/vars/{{ item }} {% endfor %}
+      changed_when: false
 
     - name: Copy manager external images
       ansible.builtin.command:
