@@ -36,6 +36,9 @@ REGISTRY_PREFIX = {
     "images_osism": "osism",
     "images_kolla_metalbox": "kolla",
     "images_kolla": "kolla",
+    "images_manager_latest_external": "dockerhub",
+    "images_manager_latest": "osism",
+    "images_ceph_latest": "osism",
 }
 
 

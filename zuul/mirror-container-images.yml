@@ -8,6 +8,7 @@
     _publish: "{{ publish | default(False) }}"
     _full: "{{ full | default(False) }}"
     _openstack_version: "{{ openstack_version | default('') }}"
+    _ceph_version: "{{ ceph_version | default('') }}"
     _tarball_name: "{{ 'registry-' ~ _openstack_version ~ '-full.tar.bz2' if _full | bool else 'registry.tar.bz2' }}"
 
     # The image-list vars files this job copies; loaded below and checked
@@ -17,7 +18,25 @@
          + (['container-images-openstack-' ~ _openstack_version ~ '.yml'] if _full | bool else [])
          + (['container-images-manager-stable.yml'] if (_full | bool and _openstack_version == 'stable') else []) }}
 
+    # A latest tarball serves a manager_version: latest pod. Its manager set
+    # is resolved at build time from the runners it ships.
+    _latest: "{{ _full | bool and _openstack_version != 'stable' }}"
+    _latest_runners:
+      - "osism-ansible:latest"
+      - "kolla-ansible:{{ _openstack_version }}"
+      - "ceph-ansible:{{ _ceph_version }}"
+    _latest_dir: "{{ ansible_user_dir }}/latest"
+    _latest_vars: "{{ ansible_user_dir }}/latest/container-images-latest.yml"
+    _manifest: "{{ ansible_user_dir }}/{{ _tarball_name }}.MANIFEST.yml"
+    _manifest_in_volume: metalbox-registry-manifest.yml
+
   tasks:
+    - name: Require a Ceph stream for a latest tarball
+      ansible.builtin.assert:
+        that: _ceph_version | length > 0
+        fail_msg: "a latest tarball needs ceph_version (the Ceph stream its pods deploy)"
+      when: _latest | bool
+
     - name: Load the image lists
       ansible.builtin.include_vars: "vars/{{ item }}"
       loop: "{{ _image_lists }}"
@@ -35,6 +54,73 @@
           - "5000:5000"
         volumes:
           - registry:/var/lib/registry
+
+    - name: Copy the runners of a latest pod
+      ansible.builtin.command:
+        cmd: "skopeo copy --retry-times 2 --dest-tls-verify=false docker://{{ docker_registry }}/osism/{{ item }} docker://localhost:5000/osism/{{ item }}"
+      loop: "{{ _latest_runners }}"
+      changed_when: false
+      when: _latest | bool
+
+    # The pins are read from the copies, so they belong to the exact runners
+    # the tarball ships even if a tag moves upstream meanwhile. Every runner
+    # contributes its versions.yml, which the inventory reconciler turns into
+    # group_vars/all/100-versions-<runner>.yml; osism-ansible also contributes
+    # the role defaults those values override.
+    - name: Extract the pins from the copied runners
+      ansible.builtin.shell:
+        executable: /bin/bash
+        cmd: |
+          set -euo pipefail
+          rm -rf "{{ _latest_dir }}/runners"
+          for runner in {{ _latest_runners | join(' ') }}; do
+            name=${runner%%:*}
+            dir="{{ _latest_dir }}/runners/$name"
+            mkdir -p "$dir"
+            skopeo inspect --tls-verify=false "docker://localhost:5000/osism/$runner" \
+              | python3 -c 'import json, sys; print(json.load(sys.stdin)["Digest"])' > "$dir/digest"
+            image="localhost:5000/osism/${name}@$(cat "$dir/digest")"
+            docker pull -q "$image" > /dev/null
+            container=$(docker create "$image" true)
+            docker cp "$container:/ansible/group_vars/all/versions.yml" "$dir/versions.yml"
+            if [[ "$name" == osism-ansible ]]; then
+              for collection in services validations; do
+                mkdir -p "$dir/$collection"
+                docker cp "$container:/usr/share/ansible/collections/ansible_collections/osism/$collection/roles" - \
+                  | tar -x -C "$dir/$collection" --wildcards 'roles/*/defaults/main.yml'
+              done
+            fi
+            docker rm "$container" > /dev/null
+          done
+      changed_when: false
+      when: _latest | bool
+
+    - name: Resolve the manager set of a latest pod
+      ansible.builtin.command:
+        chdir: "{{ zuul.project.src_dir }}"
+        cmd: >-
+          python3 zuul/resolve-container-images-latest.py
+          --openstack-version {{ _openstack_version }}
+          --ceph-version {{ _ceph_version }}
+          --runner-images {{ _latest_dir }}/runners
+          --output {{ _latest_vars }}
+          --manifest {{ _manifest }}
+      changed_when: false
+      when: _latest | bool
+
+    # include_vars reads on the executor; the resolver wrote on the node.
+    - name: Read the manager set of a latest pod
+      ansible.builtin.slurp:
+        src: "{{ _latest_vars }}"
+      register: _latest_vars_file
+      when: _latest | bool
+
+    - name: Load the manager set of a latest pod
+      ansible.builtin.set_fact:
+        images_manager_latest_external: "{{ (_latest_vars_file.content | b64decode | from_yaml).images_manager_latest_external }}"
+        images_manager_latest: "{{ (_latest_vars_file.content | b64decode | from_yaml).images_manager_latest }}"
+        images_ceph_latest: "{{ (_latest_vars_file.content | b64decode | from_yaml).images_ceph_latest }}"
+      when: _latest | bool
 
     - name: Check that every image to copy resolves at its source
       ansible.builtin.command:
@@ -54,13 +140,13 @@
     - name: Copy manager images
       ansible.builtin.command:
         cmd: "skopeo copy --retry-times 2 --dest-tls-verify=false docker://{{ docker_registry }}/osism/{{ item }} docker://localhost:5000/osism/{{ item }}"
-      loop: "{{ images_manager }}"
+      loop: "{{ images_manager | difference(_latest_runners if _latest | bool else []) }}"
       changed_when: false
 
     - name: Copy osism images
       ansible.builtin.command:
         cmd: "skopeo copy --retry-times 2 --dest-tls-verify=false docker://{{ docker_registry }}/osism/{{ item }} docker://localhost:5000/osism/{{ item }}"
-      loop: "{{ images_osism | default([]) }}"
+      loop: "{{ images_osism | default([]) | difference(_latest_runners if _latest | bool else []) }}"
       changed_when: false
       when: _full | bool
 
@@ -94,6 +180,63 @@
       when:
         - _full | bool
         - _openstack_version == "stable"
+
+    - name: Copy latest manager external images
+      ansible.builtin.command:
+        cmd: "skopeo copy --retry-times 2 --dest-tls-verify=false docker://{{ docker_registry }}/dockerhub/{{ item }} docker://localhost:5000/{{ item }}"
+      loop: "{{ images_manager_latest_external | default([]) }}"
+      changed_when: false
+      when: _latest | bool
+
+    # The runners were copied once, before their pins were read; copying
+    # them again could replace them with a newer build.
+    - name: Copy latest manager images
+      ansible.builtin.command:
+        cmd: "skopeo copy --retry-times 2 --dest-tls-verify=false docker://{{ docker_registry }}/osism/{{ item }} docker://localhost:5000/osism/{{ item }}"
+      loop: "{{ images_manager_latest | default([]) | difference(_latest_runners) }}"
+      changed_when: false
+      when: _latest | bool
+
+    - name: Copy latest Ceph images
+      ansible.builtin.command:
+        cmd: "skopeo copy --retry-times 2 --dest-tls-verify=false docker://{{ docker_registry }}/osism/{{ item }} docker://localhost:5000/osism/{{ item }}"
+      loop: "{{ images_ceph_latest | default([]) }}"
+      changed_when: false
+      when: _latest | bool
+
+    # Every loop skips the runners, but check the outcome rather than trust
+    # the filters: the tarball must ship the runners the pins came from.
+    - name: Verify the registry holds the runners the pins were read from
+      ansible.builtin.shell:
+        executable: /bin/bash
+        cmd: |
+          set -euo pipefail
+          for runner in {{ _latest_runners | join(' ') }}; do
+            name=${runner%%:*}
+            now=$(skopeo inspect --tls-verify=false "docker://localhost:5000/osism/$runner" \
+              | python3 -c 'import json, sys; print(json.load(sys.stdin)["Digest"])')
+            read=$(cat "{{ _latest_dir }}/runners/$name/digest")
+            if [[ "$now" != "$read" ]]; then
+              echo "$runner: registry holds $now, pins were read from $read" >&2
+              exit 1
+            fi
+          done
+      changed_when: false
+      when: _latest | bool
+
+    - name: Put the manifest into the registry volume
+      ansible.builtin.command:
+        cmd: "docker cp {{ _manifest }} registry:/var/lib/registry/{{ _manifest_in_volume }}"
+      changed_when: false
+      when: _latest | bool
+
+    - name: Keep the manifest in the job logs
+      ansible.builtin.copy:
+        src: "{{ _manifest }}"
+        dest: "{{ ansible_user_dir }}/zuul-output/logs/"
+        remote_src: true
+        mode: "0644"
+      when: _latest | bool
 
     - name: Check that the box can pull every image it deploys
       ansible.builtin.command:
@@ -197,8 +340,12 @@
           # published pair is inconsistent only for the small object and a
           # failed tarball upload leaves the previous pair intact. set -e is
           # what makes the order meaningful: without it the checksum would be
-          # published even when the tarball upload failed.
+          # published even when the tarball upload failed. The manifest goes
+          # before the checksum for the same reason.
           rclone copyto {{ _tarball_name }} s3:osism/metalbox/{{ _tarball_name }}
+          {% if _latest | bool %}
+          rclone copyto {{ _tarball_name }}.MANIFEST.yml s3:osism/metalbox/{{ _tarball_name }}.MANIFEST.yml
+          {% endif %}
           rclone copyto {{ _tarball_name }}.CHECKSUM s3:osism/metalbox/{{ _tarball_name }}.CHECKSUM
       environment:
         RCLONE_CONFIG: "{{ ansible_user_dir }}/.rclone.conf"

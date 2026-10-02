@@ -90,6 +90,7 @@
     files:
       - "^zuul/mirror-container-images.yml"
       - "^zuul/pre-mirror-container-images.yml"
+      - "^zuul/resolve-container-images-latest.py"
       - "^zuul/vars/container-images-metalbox.yml"
       - "^zuul/vars/container-images-manager-stable.yml"
       - "^zuul/vars/container-images-openstack-2025.1.yml"
@@ -113,12 +114,18 @@
       full: false
 
 - job:
-    name: metalbox-mirror-container-images-2025.1-full
+    name: metalbox-mirror-container-images-latest-2025.1
     parent: metalbox-mirror-container-images
+    abstract: true
     timeout: 7200
     vars:
       full: true
       openstack_version: "2025.1"
+      ceph_version: reef
+
+- job:
+    name: metalbox-mirror-container-images-2025.1-full
+    parent: metalbox-mirror-container-images-latest-2025.1
 
 - job:
     name: metalbox-mirror-container-images-stable-full
@@ -185,14 +192,11 @@
 
 - job:
     name: metalbox-mirror-container-images-2025.1-full-publish
-    parent: metalbox-mirror-container-images
+    parent: metalbox-mirror-container-images-latest-2025.1
     semaphores:
       - name: semaphore-metalbox-mirror-container-images-2025.1-full-publish
-    timeout: 7200
     vars:
-      full: true
       publish: true
-      openstack_version: "2025.1"
     secrets:
       - name: secret
         secret: SECRET_METALBOX
