@@ -10,6 +10,10 @@ images_manager_external:
   - library/redis:7.4.7-alpine
   - library/traefik:v3.4.1
   - pgautoupgrade/pgautoupgrade:16-alpine
+  # 0.28.4 is what a stable osism-ansible without the release-pin
+  # transport deploys (role default). Drop it once the stable
+  # lists target a release whose osism-ansible carries stepca_tag
+  # in versions.yml; the stable list then carries the tag deployed.
   - smallstep/step-ca:0.28.4
   - ubuntu/squid:6.1-23.10_beta
 
