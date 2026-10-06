@@ -10,7 +10,7 @@ images_manager_stable_external:
   - library/redis:7.4.10-alpine
   - library/registry:3.0
   - library/traefik:v3.7.10
-  - otel/opentelemetry-collector-contrib:0.158.0
+  - otel/opentelemetry-collector-contrib:0.161.0
   - pgautoupgrade/pgautoupgrade:16-alpine
   - phpmyadmin/phpmyadmin:5.2.3
   - smallstep/step-ca:0.30.2
@@ -18,17 +18,17 @@ images_manager_stable_external:
 
 images_manager_stable:
   - ara-server:1.8.0-r1
-  - ceph-ansible:0.20260811.0
+  - ceph-ansible:0.20261001.0
   - dnsdist:1.9.8
   - dnsmasq-osism:2.91
   - gnmic:0.41.0
-  - inventory-reconciler:0.20260810.0
-  - kolla-ansible:0.20260814.0
+  - inventory-reconciler:0.20261001.0
+  - kolla-ansible:0.20261001.0
   - netbox:v4.3.5
-  - openstackclient:2025.1
-  - osism-ansible:0.20260811.0
-  - osism-frontend:0.20260808.0
-  - osism-kubernetes:0.20260811.0
-  - osism:0.20260808.0
+  - openstackclient:10.3.0
+  - osism-ansible:0.20261001.0
+  - osism-frontend:0.20261001.1
+  - osism-kubernetes:0.20261001.0
+  - osism:0.20261001.1
   - rsync:latest
   - tempest:latest
