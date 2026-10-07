@@ -13,8 +13,10 @@ The two stable image lists pin every image of the stable registry tarball
   container-images-openstack-stable.yml
       The kolla version in base.yml names the SBOM image
       registry.osism.tech/kolla/release/<openstack version>/sbom:<kolla>.
-      Its /images.yml lists every Kolla image of that build; the tags in
-      the file are replaced with the ones listed there.
+      Its /images.yml lists every Kolla image of that build; the tags of
+      the images_kolla entries are replaced with the ones listed there.
+      The images_osism entries (ceph-daemon, cephclient) get the
+      ceph_image_version and cephclient_version the runners carry.
 
 The runners are the osism-ansible, kolla-ansible and ceph-ansible images
 the release pins in base.yml. Each carries
@@ -24,7 +26,9 @@ those values. The script merges the files in the order those names sort
 (a later one wins); a runner the release does not pin (no ceph-ansible on
 a cephadm release) adds nothing, as it adds nothing to a pod. Nothing is
 read from latest/: it moves on after a release is cut, the runners do
-not.
+not. Release builds of osism-ansible that pin the Ceph images per series
+(ceph_image_versions, cephclient_versions) are resolved for the series
+the runners name in ceph_version, or the one --ceph-version selects.
 
 Only the tags of the images already listed are updated; images are never
 added or removed. The OpenStack release in the kolla entries
@@ -33,12 +37,15 @@ for another one. Entries without a counterpart in the release (for example
 library/httpd or rsync:latest) are kept unchanged and reported, and so is
 the number of images the release provides that the files do not list.
 
-Usage: update-container-images-stable.py [-n] [-v] [-o VERSION] [RELEASE]
+Usage: update-container-images-stable.py [-n] [-v] [-o VERSION] [-c SERIES] [RELEASE]
 
   RELEASE                  OSISM release, e.g. 10.2.0. Default: the highest
                            numbered X.Y.Z release directory in osism/release.
   -o, --openstack-version  Move the kolla entries to this OpenStack release.
                            Default: the release the entries currently use.
+  -c, --ceph-version       Ceph release series (e.g. reef) for runners that
+                           pin the Ceph images per series. Default: the
+                           ceph_version the runners carry.
   -n, --dry-run            Report the changes without writing the files.
   -v, --verbose            Also report unchanged entries and name the images
                            of the release that are not listed.
@@ -125,6 +132,13 @@ MANAGER_IMAGES = {
         "osism-kubernetes": "osism_kubernetes",
         "tempest": "tempest",
     },
+}
+
+# Image name in the images_osism list of container-images-openstack-stable.yml
+# -> the runner variable that pins it, without its _version(s) suffix.
+OSISM_IMAGES = {
+    "ceph-daemon": "ceph_image",
+    "cephclient": "cephclient",
 }
 
 # The runners whose versions.yml the inventory reconciler installs, with their
@@ -369,14 +383,30 @@ def runner_pins(versions):
     return context
 
 
-def runner_pin(context, stem):
-    """Return (tag, None) for <stem>_version as a pod resolves it, or (None, reason)."""
+def runner_pin(context, stem, series):
+    """Return (tag, None) for <stem>_version as a pod resolves it, or (None, reason).
+
+    The <stem>_version that won the merge decides, as it does for the pod: a
+    literal tag is the pin. Runners that pin per Ceph series carry a
+    <stem>_versions mapping and a <stem>_version template that picks from it
+    with ceph_version; only then is the mapping consulted, with series
+    standing in for ceph_version.
+    """
     tag = context.get(f"{stem}_version")
+    if isinstance(tag, str) and tag and "{{" not in tag:
+        return tag, None
+    by_series = context.get(f"{stem}_versions")
+    if isinstance(by_series, dict):
+        known = ", ".join(sorted(by_series))
+        if not series:
+            return None, f"{stem}_versions has {known}; pass --ceph-version"
+        tag = by_series.get(series)
+        if not tag:
+            return None, f"{stem}_versions has no {series} (it has {known})"
+        return tag, None
     if not isinstance(tag, str) or not tag:
         return None, f"no {stem}_version in the runners"
-    if "{{" in tag:
-        return None, f"{stem}_version is a template the script cannot resolve: {tag}"
-    return tag, None
+    return None, f"{stem}_version is a template the script cannot resolve: {tag}"
 
 
 def resolve_manager(versions, missing=None):
@@ -402,8 +432,20 @@ def resolve_manager(versions, missing=None):
     return resolve
 
 
-def resolve_openstack(openstack_version, tags, sbom_image):
+def resolve_openstack(openstack_version, tags, sbom_image, osism):
+    """osism maps each OSISM_IMAGES name to a runner_pin() result."""
+
     def resolve(list_name, image):
+        if list_name == "images_osism":
+            name, _, _ = image.rpartition(":")
+            if not name:
+                return unresolved("entry has no tag")
+            if name not in osism:
+                return unresolved("no mapping in OSISM_IMAGES")
+            tag, reason = osism[name]
+            if tag is None:
+                return unresolved(reason)
+            return resolved(f"{name}:{tag}")
         if list_name != "images_kolla":
             return unresolved(f"unknown list {list_name}")
         match = KOLLA_ENTRY_RE.match(image)
@@ -593,6 +635,15 @@ def parse_args(argv=None):
         ),
     )
     parser.add_argument(
+        "-c",
+        "--ceph-version",
+        metavar="SERIES",
+        help=(
+            "Ceph release series for runners that pin the Ceph images per "
+            "series (default: the ceph_version the runners carry)"
+        ),
+    )
+    parser.add_argument(
         "-n",
         "--dry-run",
         action="store_true",
@@ -652,7 +703,7 @@ def main(argv=None):
 
     # A pod deploys the runners' openstackclient_version; a base.yml pin of
     # the same image is only what the runners were built from.
-    openstackclient, reason = runner_pin(context, "openstackclient")
+    openstackclient, reason = runner_pin(context, "openstackclient", None)
     pinned = versions.pop("openstackclient", None)
     missing = {}
     if openstackclient is None:
@@ -664,6 +715,12 @@ def main(argv=None):
                 f"{openstackclient}; using the runners'"
             )
         versions["openstackclient"] = openstackclient
+    series = args.ceph_version or context.get("ceph_version")
+    if series and "{{" in series:
+        series = None
+    osism = {
+        name: runner_pin(context, stem, series) for name, stem in OSISM_IMAGES.items()
+    }
 
     updates = []
     for path, lines, entries, resolve in (
@@ -677,7 +734,7 @@ def main(argv=None):
             OPENSTACK_FILE,
             openstack_lines,
             openstack_entries,
-            resolve_openstack(openstack_version, tags, sbom_image),
+            resolve_openstack(openstack_version, tags, sbom_image, osism),
         ),
     ):
         updates.append(update_entries(path, lines, entries, resolve, args.verbose))
