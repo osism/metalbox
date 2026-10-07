@@ -51,7 +51,6 @@ fails, git diff zuul/vars shows what the first one changed.
 
 import argparse
 import contextlib
-import io
 import json
 import os
 import re
@@ -260,44 +259,67 @@ def release_versions(release, openstack_version):
     return versions
 
 
-def sbom_via_docker(image):
+def file_via_docker(image, path):
     run(["docker", "pull", "--quiet", "--platform", "linux/amd64", image])
     # The SBOM image is built from scratch and has no command. docker create
     # insists on one; the container is never started, so any string will do.
-    result = run(
-        ["docker", "create", "--platform", "linux/amd64", image, "/images.yml"]
-    )
+    result = run(["docker", "create", "--platform", "linux/amd64", image, path])
     container = result.stdout.decode().strip()
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
-            run(["docker", "cp", f"{container}:/images.yml", tmpdir])
-            return Path(tmpdir, "images.yml").read_text()
+            run(["docker", "cp", f"{container}:{path}", tmpdir])
+            return Path(tmpdir, PurePosixPath(path).name).read_text()
     finally:
         subprocess.run(["docker", "rm", "-f", container], capture_output=True)
 
 
-def sbom_via_crane(image):
-    result = run(["crane", "--platform", "linux/amd64", "export", image, "-"])
-    with tarfile.open(fileobj=io.BytesIO(result.stdout)) as tar:
-        # The member may be stored as images.yml, ./images.yml or /images.yml.
-        for member in tar:
-            if member.isfile() and PurePosixPath("/", member.name) == PurePosixPath(
-                "/images.yml"
-            ):
-                return tar.extractfile(member).read().decode()
-    raise Fatal(f"{image} contains no images.yml")
+def file_via_crane(image, path):
+    """Read one file from the flattened image, streaming crane's export.
+
+    The export is read as a stream and abandoned once the file is found,
+    so an image of any size is never held in memory.
+    """
+    cmd = ["crane", "--platform", "linux/amd64", "export", image, "-"]
+    try:
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except FileNotFoundError as e:
+        raise Fatal("crane: command not found") from e
+    found = None
+    try:
+        # The member may be stored as path, ./path or /path.
+        with tarfile.open(fileobj=process.stdout, mode="r|") as tar:
+            for member in tar:
+                if member.isfile() and PurePosixPath("/", member.name) == PurePosixPath(
+                    path
+                ):
+                    found = tar.extractfile(member).read().decode()
+                    break
+    except tarfile.TarError:
+        pass  # an empty or cut-off stream; the exit status says why
+    finally:
+        process.stdout.close()
+        stderr = process.stderr.read().decode(errors="replace").strip()
+        process.wait()
+    if found is not None:
+        return found
+    if process.returncode:
+        raise Fatal(f"{' '.join(cmd)} failed:\n{stderr}")
+    raise Fatal(f"{image} contains no {path}")
+
+
+def image_file(image, path):
+    """Return the text of the file at path inside image."""
+    if shutil.which("docker"):
+        return file_via_docker(image, path)
+    if shutil.which("crane"):
+        return file_via_crane(image, path)
+    raise Fatal("docker or crane is required to read files from images")
 
 
 def sbom_tags(image, openstack_version):
     """Return {image name: tag} from the images.yml inside the SBOM image."""
-    if shutil.which("docker"):
-        read_sbom = sbom_via_docker
-    elif shutil.which("crane"):
-        read_sbom = sbom_via_crane
-    else:
-        raise Fatal("docker or crane is required to read the SBOM image")
     try:
-        text = read_sbom(image)
+        text = image_file(image, "/images.yml")
     except Fatal as e:
         message = str(e)
         # docker reports "repository ... not found", crane "NAME_UNKNOWN" or

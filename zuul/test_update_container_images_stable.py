@@ -359,23 +359,47 @@ class ReleaseVersionsTest(unittest.TestCase):
             )
 
 
-class SbomViaCraneTest(unittest.TestCase):
-    def crane(self, names):
-        with mock.patch.object(
-            script, "run", return_value=mock.Mock(stdout=tar_with(names))
-        ):
-            return script.sbom_via_crane(
-                "registry.osism.tech/kolla/release/2025.1/sbom:x"
-            )
+class FakeProcess:
+    """A crane export as file_via_crane sees it: a tar stream and an exit code."""
 
-    def test_images_yml_is_found_under_any_root_spelling(self):
+    def __init__(self, stdout, returncode=0, stderr=b""):
+        self.stdout = io.BytesIO(stdout)
+        self.stderr = io.BytesIO(stderr)
+        self.returncode = None
+        self._returncode = returncode
+
+    def wait(self):
+        self.returncode = self._returncode
+        return self.returncode
+
+
+class FileViaCraneTest(unittest.TestCase):
+    def crane(self, process, path="/images.yml"):
+        with mock.patch.object(script.subprocess, "Popen", return_value=process):
+            return script.file_via_crane("registry.osism.tech/osism/x:1", path)
+
+    def test_file_is_found_under_any_root_spelling(self):
         for name in ("images.yml", "./images.yml", "/images.yml"):
             with self.subTest(name=name):
-                self.assertEqual(self.crane([name]), "images: []\n")
+                self.assertEqual(
+                    self.crane(FakeProcess(tar_with([name]))), "images: []\n"
+                )
 
-    def test_missing_images_yml_is_fatal(self):
-        with self.assertRaisesRegex(script.Fatal, "contains no images.yml"):
-            self.crane(["./other.yml", "./etc/images.yml"])
+    def test_file_in_a_directory(self):
+        process = FakeProcess(tar_with(["./ansible/group_vars/all/versions.yml"]))
+        self.assertEqual(
+            self.crane(process, "/ansible/group_vars/all/versions.yml"), "images: []\n"
+        )
+
+    def test_missing_file_is_fatal(self):
+        with self.assertRaisesRegex(script.Fatal, "contains no /images.yml"):
+            self.crane(FakeProcess(tar_with(["./other.yml", "./etc/images.yml"])))
+
+    def test_failed_export_is_fatal_with_its_error(self):
+        with self.assertRaisesRegex(
+            script.Fatal, "export .* failed:\nMANIFEST_UNKNOWN"
+        ):
+            self.crane(FakeProcess(b"", returncode=1, stderr=b"MANIFEST_UNKNOWN\n"))
 
 
 class WriteFileTest(unittest.TestCase):
