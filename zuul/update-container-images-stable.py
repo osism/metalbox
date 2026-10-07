@@ -7,15 +7,28 @@ The two stable image lists pin every image of the stable registry tarball
 
   container-images-manager-stable.yml
       Tags come from the docker_images section of <release>/base.yml in
-      https://github.com/osism/release. base.yml does not pin
-      openstackclient; when the key is missing there, the tag is taken from
-      latest/openstack-<version>.yml, the way osism-ansible resolves it.
+      https://github.com/osism/release. openstackclient is the exception:
+      its tag is the openstackclient_version the release's runners carry.
 
   container-images-openstack-stable.yml
       The kolla version in base.yml names the SBOM image
       registry.osism.tech/kolla/release/<openstack version>/sbom:<kolla>.
-      Its /images.yml lists every Kolla image of that build; the tags in
-      the file are replaced with the ones listed there.
+      Its /images.yml lists every Kolla image of that build; the tags of
+      the images_kolla entries are replaced with the ones listed there.
+      The images_osism entries (ceph-daemon, cephclient) get the
+      ceph_image_version and cephclient_version the runners carry.
+
+The runners are the osism-ansible, kolla-ansible and ceph-ansible images
+the release pins in base.yml. Each carries
+/ansible/group_vars/all/versions.yml, which the inventory reconciler
+installs as group_vars/all/100-versions-<runner>.yml, so a pod deploys
+those values. The script merges the files in the order those names sort
+(a later one wins); a runner the release does not pin (no ceph-ansible on
+a cephadm release) adds nothing, as it adds nothing to a pod. Nothing is
+read from latest/: it moves on after a release is cut, the runners do
+not. Release builds of osism-ansible that pin the Ceph images per series
+(ceph_image_versions, cephclient_versions) are resolved for the series
+the runners name in ceph_version, or the one --ceph-version selects.
 
 Only the tags of the images already listed are updated; images are never
 added or removed. The OpenStack release in the kolla entries
@@ -24,19 +37,23 @@ for another one. Entries without a counterpart in the release (for example
 library/httpd or rsync:latest) are kept unchanged and reported, and so is
 the number of images the release provides that the files do not list.
 
-Usage: update-container-images-stable.py [-n] [-v] [-o VERSION] [RELEASE]
+Usage: update-container-images-stable.py [-n] [-v] [-o VERSION] [-c SERIES] [RELEASE]
 
   RELEASE                  OSISM release, e.g. 10.2.0. Default: the highest
                            numbered X.Y.Z release directory in osism/release.
   -o, --openstack-version  Move the kolla entries to this OpenStack release.
                            Default: the release the entries currently use.
+  -c, --ceph-version       Ceph release series (e.g. reef) for runners that
+                           pin the Ceph images per series. Default: the
+                           ceph_version the runners carry.
   -n, --dry-run            Report the changes without writing the files.
   -v, --verbose            Also report unchanged entries and name the images
                            of the release that are not listed.
 
-Requirements: python3 with PyYAML, docker (or crane) to read the SBOM image,
-network access to github.com and registry.osism.tech. GITHUB_TOKEN is sent
-to the GitHub API when set (only needed to avoid the anonymous rate limit).
+Requirements: python3 with PyYAML, docker (or crane) to read the SBOM and the
+runner images, network access to github.com and registry.osism.tech.
+GITHUB_TOKEN is sent to the GitHub API when set (only needed to avoid the
+anonymous rate limit).
 
 Exit status: 0 on success, 1 on a fatal error, 2 when some entries could not
 be resolved (the other entries are still updated unless -n is given).
@@ -51,7 +68,6 @@ fails, git diff zuul/vars shows what the first one changed.
 
 import argparse
 import contextlib
-import io
 import json
 import os
 import re
@@ -106,8 +122,7 @@ MANAGER_IMAGES = {
         "inventory-reconciler": "inventory_reconciler",
         "kolla-ansible": "kolla_ansible",
         "netbox": "netbox",
-        # openstackclient is taken from latest/openstack-<version>.yml unless
-        # base.yml pins it
+        # filled in from the runners' openstackclient_version, see main()
         "openstackclient": "openstackclient",
         "osism": "osism",
         "osism-ansible": "osism_ansible",
@@ -118,6 +133,26 @@ MANAGER_IMAGES = {
         "tempest": "tempest",
     },
 }
+
+# Image name in the images_osism list of container-images-openstack-stable.yml
+# -> the runner variable that pins it, without its _version(s) suffix.
+OSISM_IMAGES = {
+    "ceph-daemon": "ceph_image",
+    "cephclient": "cephclient",
+}
+
+# The runners whose versions.yml the inventory reconciler installs, with their
+# key in docker_images, in the order the installed files sort; a later one wins.
+# A runner the release does not pin gives the pod no file and is skipped; a
+# release without ceph-ansible deploys Ceph with cephadm. osism-ansible is
+# always there.
+REQUIRED_RUNNER = "osism_ansible"
+RUNNERS = (
+    ("ceph-ansible", "ceph_ansible"),
+    ("kolla-ansible", "kolla_ansible"),
+    ("osism-ansible", "osism_ansible"),
+)
+RUNNER_VERSIONS = "/ansible/group_vars/all/versions.yml"
 
 RELEASE_VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 # The vars files are rewritten line by line to keep comments and blank lines,
@@ -227,8 +262,8 @@ def latest_release():
     return max(versions, key=lambda v: tuple(int(part) for part in v.split(".")))
 
 
-def release_versions(release, openstack_version):
-    """Return the docker_images of the release plus openstackclient."""
+def release_versions(release):
+    """Return the docker_images section of <release>/base.yml."""
     base = load_yaml(
         fetch(
             f"{RELEASE_RAW}/{release}/base.yml",
@@ -238,66 +273,70 @@ def release_versions(release, openstack_version):
     versions = dict(base.get("docker_images") or {})
     if "kolla" not in versions:
         raise Fatal(f"{release}/base.yml has no docker_images.kolla entry")
-
-    openstack = load_yaml(
-        fetch(
-            f"{RELEASE_RAW}/latest/openstack-{openstack_version}.yml",
-            not_found=(
-                f"OpenStack {openstack_version} is unknown to osism/release "
-                f"(no latest/openstack-{openstack_version}.yml)"
-            ),
-        )
-    )
-    # A pin in base.yml is release-scoped and wins; latest/ only fills the gap.
-    openstackclient = (openstack.get("docker_images") or {}).get("openstackclient")
-    if openstackclient:
-        versions.setdefault("openstackclient", openstackclient)
-    elif "openstackclient" not in versions:
-        warn(
-            f"neither {release}/base.yml nor latest/openstack-{openstack_version}.yml "
-            "pins an openstackclient tag"
-        )
     return versions
 
 
-def sbom_via_docker(image):
+def file_via_docker(image, path):
     run(["docker", "pull", "--quiet", "--platform", "linux/amd64", image])
     # The SBOM image is built from scratch and has no command. docker create
     # insists on one; the container is never started, so any string will do.
-    result = run(
-        ["docker", "create", "--platform", "linux/amd64", image, "/images.yml"]
-    )
+    result = run(["docker", "create", "--platform", "linux/amd64", image, path])
     container = result.stdout.decode().strip()
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
-            run(["docker", "cp", f"{container}:/images.yml", tmpdir])
-            return Path(tmpdir, "images.yml").read_text()
+            run(["docker", "cp", f"{container}:{path}", tmpdir])
+            return Path(tmpdir, PurePosixPath(path).name).read_text()
     finally:
         subprocess.run(["docker", "rm", "-f", container], capture_output=True)
 
 
-def sbom_via_crane(image):
-    result = run(["crane", "--platform", "linux/amd64", "export", image, "-"])
-    with tarfile.open(fileobj=io.BytesIO(result.stdout)) as tar:
-        # The member may be stored as images.yml, ./images.yml or /images.yml.
-        for member in tar:
-            if member.isfile() and PurePosixPath("/", member.name) == PurePosixPath(
-                "/images.yml"
-            ):
-                return tar.extractfile(member).read().decode()
-    raise Fatal(f"{image} contains no images.yml")
+def file_via_crane(image, path):
+    """Read one file from the flattened image, streaming crane's export.
+
+    The export is read as a stream and abandoned once the file is found,
+    so an image of any size is never held in memory.
+    """
+    cmd = ["crane", "--platform", "linux/amd64", "export", image, "-"]
+    try:
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except FileNotFoundError as e:
+        raise Fatal("crane: command not found") from e
+    found = None
+    try:
+        # The member may be stored as path, ./path or /path.
+        with tarfile.open(fileobj=process.stdout, mode="r|") as tar:
+            for member in tar:
+                if member.isfile() and PurePosixPath("/", member.name) == PurePosixPath(
+                    path
+                ):
+                    found = tar.extractfile(member).read().decode()
+                    break
+    except tarfile.TarError:
+        pass  # an empty or cut-off stream; the exit status says why
+    finally:
+        process.stdout.close()
+        stderr = process.stderr.read().decode(errors="replace").strip()
+        process.wait()
+    if found is not None:
+        return found
+    if process.returncode:
+        raise Fatal(f"{' '.join(cmd)} failed:\n{stderr}")
+    raise Fatal(f"{image} contains no {path}")
+
+
+def image_file(image, path):
+    """Return the text of the file at path inside image."""
+    if shutil.which("docker"):
+        return file_via_docker(image, path)
+    if shutil.which("crane"):
+        return file_via_crane(image, path)
+    raise Fatal("docker or crane is required to read files from images")
 
 
 def sbom_tags(image, openstack_version):
     """Return {image name: tag} from the images.yml inside the SBOM image."""
-    if shutil.which("docker"):
-        read_sbom = sbom_via_docker
-    elif shutil.which("crane"):
-        read_sbom = sbom_via_crane
-    else:
-        raise Fatal("docker or crane is required to read the SBOM image")
     try:
-        text = read_sbom(image)
+        text = image_file(image, "/images.yml")
     except Fatal as e:
         message = str(e)
         # docker reports "repository ... not found", crane "NAME_UNKNOWN" or
@@ -326,7 +365,54 @@ def sbom_tags(image, openstack_version):
     return tags
 
 
-def resolve_manager(versions):
+def runner_pins(versions):
+    """Return the variables the release's runners hand to a pod's inventory."""
+    if REQUIRED_RUNNER not in versions:
+        raise Fatal(f"docker_images.{REQUIRED_RUNNER} missing in the release")
+    context = {}
+    for name, key in RUNNERS:
+        if key not in versions:
+            print(f"Runner: {name} is not part of the release")
+            continue
+        image = f"{REGISTRY}/osism/{name}:{versions[key]}"
+        print(f"Runner: {image}")
+        data = load_yaml(image_file(image, RUNNER_VERSIONS))
+        if not isinstance(data, dict):
+            raise Fatal(f"{image}: {RUNNER_VERSIONS} is not a mapping")
+        context.update(data)
+    return context
+
+
+def runner_pin(context, stem, series):
+    """Return (tag, None) for <stem>_version as a pod resolves it, or (None, reason).
+
+    The <stem>_version that won the merge decides, as it does for the pod: a
+    literal tag is the pin. Runners that pin per Ceph series carry a
+    <stem>_versions mapping and a <stem>_version template that picks from it
+    with ceph_version; only then is the mapping consulted, with series
+    standing in for ceph_version.
+    """
+    tag = context.get(f"{stem}_version")
+    if isinstance(tag, str) and tag and "{{" not in tag:
+        return tag, None
+    by_series = context.get(f"{stem}_versions")
+    if isinstance(by_series, dict):
+        known = ", ".join(sorted(by_series))
+        if not series:
+            return None, f"{stem}_versions has {known}; pass --ceph-version"
+        tag = by_series.get(series)
+        if not tag:
+            return None, f"{stem}_versions has no {series} (it has {known})"
+        return tag, None
+    if not isinstance(tag, str) or not tag:
+        return None, f"no {stem}_version in the runners"
+    return None, f"{stem}_version is a template the script cannot resolve: {tag}"
+
+
+def resolve_manager(versions, missing=None):
+    """missing explains, per docker_images key, why versions lacks it."""
+    missing = missing or {}
+
     def resolve(list_name, image):
         mapping = MANAGER_IMAGES.get(list_name)
         if mapping is None:
@@ -338,14 +424,28 @@ def resolve_manager(versions):
         if key is None:
             return unmapped("no mapping in MANAGER_IMAGES")
         if key not in versions:
-            return unresolved(f"docker_images.{key} missing in the release")
+            return unresolved(
+                missing.get(key, f"docker_images.{key} missing in the release")
+            )
         return resolved(f"{name}:{versions[key]}")
 
     return resolve
 
 
-def resolve_openstack(openstack_version, tags, sbom_image):
+def resolve_openstack(openstack_version, tags, sbom_image, osism):
+    """osism maps each OSISM_IMAGES name to a runner_pin() result."""
+
     def resolve(list_name, image):
+        if list_name == "images_osism":
+            name, _, _ = image.rpartition(":")
+            if not name:
+                return unresolved("entry has no tag")
+            if name not in osism:
+                return unresolved("no mapping in OSISM_IMAGES")
+            tag, reason = osism[name]
+            if tag is None:
+                return unresolved(reason)
+            return resolved(f"{name}:{tag}")
         if list_name != "images_kolla":
             return unresolved(f"unknown list {list_name}")
         match = KOLLA_ENTRY_RE.match(image)
@@ -535,6 +635,15 @@ def parse_args(argv=None):
         ),
     )
     parser.add_argument(
+        "-c",
+        "--ceph-version",
+        metavar="SERIES",
+        help=(
+            "Ceph release series for runners that pin the Ceph images per "
+            "series (default: the ceph_version the runners carry)"
+        ),
+    )
+    parser.add_argument(
         "-n",
         "--dry-run",
         action="store_true",
@@ -575,7 +684,7 @@ def main(argv=None):
         )
 
     release = args.release or latest_release()
-    versions = release_versions(release, openstack_version)
+    versions = release_versions(release)
     kolla_version = versions["kolla"]
     sbom_image = f"{REGISTRY}/kolla/release/{openstack_version}/sbom:{kolla_version}"
 
@@ -589,16 +698,43 @@ def main(argv=None):
         )
     print(f"SBOM image: {sbom_image}")
     tags = sbom_tags(sbom_image, openstack_version)
+    context = runner_pins(versions)
     print()
+
+    # A pod deploys the runners' openstackclient_version; a base.yml pin of
+    # the same image is only what the runners were built from.
+    openstackclient, reason = runner_pin(context, "openstackclient", None)
+    pinned = versions.pop("openstackclient", None)
+    missing = {}
+    if openstackclient is None:
+        missing["openstackclient"] = reason
+    else:
+        if pinned and pinned != openstackclient:
+            warn(
+                f"base.yml pins openstackclient {pinned}, the runners carry "
+                f"{openstackclient}; using the runners'"
+            )
+        versions["openstackclient"] = openstackclient
+    series = args.ceph_version or context.get("ceph_version")
+    if series and "{{" in series:
+        series = None
+    osism = {
+        name: runner_pin(context, stem, series) for name, stem in OSISM_IMAGES.items()
+    }
 
     updates = []
     for path, lines, entries, resolve in (
-        (MANAGER_FILE, manager_lines, manager_entries, resolve_manager(versions)),
+        (
+            MANAGER_FILE,
+            manager_lines,
+            manager_entries,
+            resolve_manager(versions, missing),
+        ),
         (
             OPENSTACK_FILE,
             openstack_lines,
             openstack_entries,
-            resolve_openstack(openstack_version, tags, sbom_image),
+            resolve_openstack(openstack_version, tags, sbom_image, osism),
         ),
     ):
         updates.append(update_entries(path, lines, entries, resolve, args.verbose))

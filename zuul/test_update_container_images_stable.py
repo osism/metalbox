@@ -36,22 +36,39 @@ images_manager_stable:
 
 OPENSTACK = """\
 ---
+images_osism:
+  - ceph-daemon:18.2.7
+  - cephclient:18.2.8
+
 images_kolla:
   - release/2025.1/cron:3.0.20260328
   - release/2025.1/keystone:27.0.3.20260814
   - release/2025.1/nova-api:31.1.2.20260328
 """
 
-# docker_images of the release: mariadb, netbox and osism moved on, redis and
-# openstackclient are unchanged, alerta has no entry in the manager file.
+# docker_images of the release: mariadb, netbox and osism moved on, redis is
+# unchanged, alerta has no entry in the manager file. openstackclient is not
+# pinned here; it comes from the runners.
 VERSIONS = {
     "alerta": "9.1.0",
+    "ceph_ansible": "0.20260811.0",
     "kolla": "0.20260814.0",
+    "kolla_ansible": "0.20260814.0",
     "mariadb": "11.8.8",
     "netbox": "v4.3.5",
-    "openstackclient": "2025.1",
     "osism": "0.20260808.0",
+    "osism_ansible": "0.20260811.0",
     "redis": "7.4.10-alpine",
+}
+
+# The runners' versions.yml merged, as runner_pins() returns it, laid out the
+# way the 10.x runners carry the Ceph pins: ceph-daemon moved on, cephclient
+# and openstackclient are unchanged.
+RUNNER_CONTEXT = {
+    "ceph_version": "reef",
+    "ceph_image_version": "18.2.8",
+    "cephclient_version": "18.2.8",
+    "openstackclient_version": "2025.1",
 }
 
 # images of the SBOM: cron and nova-api moved on, aodh-api is not listed.
@@ -87,6 +104,7 @@ class MainTest(unittest.TestCase):
         self.openstack.write_text(OPENSTACK)
         self.release_versions = mock.Mock(return_value=dict(VERSIONS))
         self.sbom_tags = mock.Mock(return_value=dict(TAGS))
+        self.runner_pins = mock.Mock(return_value=dict(RUNNER_CONTEXT))
         patcher = mock.patch.multiple(
             script,
             REPO_ROOT=self.tmp,
@@ -95,6 +113,7 @@ class MainTest(unittest.TestCase):
             latest_release=mock.Mock(return_value="10.2.0"),
             release_versions=self.release_versions,
             sbom_tags=self.sbom_tags,
+            runner_pins=self.runner_pins,
         )
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -119,15 +138,15 @@ class MainTest(unittest.TestCase):
         )
         self.assertEqual(
             self.openstack.read_text(),
-            OPENSTACK.replace("cron:3.0.20260328", "cron:3.0.20260814").replace(
-                "nova-api:31.1.2.20260328", "nova-api:31.1.2.20260814"
-            ),
+            OPENSTACK.replace("ceph-daemon:18.2.7", "ceph-daemon:18.2.8")
+            .replace("cron:3.0.20260328", "cron:3.0.20260814")
+            .replace("nova-api:31.1.2.20260328", "nova-api:31.1.2.20260814"),
         )
         # httpd and rsync are kept without making the run fail
         self.assertRegex(out, r"\n  library/httpd +alpine \(kept: ")
         self.assertRegex(out, r"\n  rsync +latest \(kept: ")
         self.assertIn("  4 updated, 2 unchanged, 2 kept\n", out)
-        self.assertIn("  2 updated, 1 unchanged, 0 kept\n", out)
+        self.assertIn("  3 updated, 2 unchanged, 0 kept\n", out)
         self.assertIn("Files updated.", out)
 
     def test_tally_sums_to_the_number_of_entries(self):
@@ -142,7 +161,7 @@ class MainTest(unittest.TestCase):
         self.assertIn("1 entries could not be resolved", err)
         tally = [line for line in out.splitlines() if line.endswith(" kept")]
         self.assertEqual(len(tally), 2)
-        for line, entries in zip(tally, (8, 3)):
+        for line, entries in zip(tally, (8, 5)):
             numbers = [int(word) for word in line.split() if word.isdigit()]
             self.assertEqual(sum(numbers), entries, line)
         # the unresolved entry is kept, the others are still written
@@ -155,7 +174,7 @@ class MainTest(unittest.TestCase):
         self.assertEqual(status, 0, err)
         self.assertEqual(self.manager.read_text(), MANAGER)
         self.assertEqual(self.openstack.read_text(), OPENSTACK)
-        self.assertIn("Dry run: 6 changes pending, nothing written.", out)
+        self.assertIn("Dry run: 7 changes pending, nothing written.", out)
         self.assertEqual(
             sorted(p.name for p in self.tmp.iterdir()),
             sorted([self.manager.name, self.openstack.name]),
@@ -183,7 +202,7 @@ class MainTest(unittest.TestCase):
     def test_openstack_release_is_taken_from_the_file(self):
         self.run_main()
 
-        self.release_versions.assert_called_once_with("10.2.0", "2025.1")
+        self.release_versions.assert_called_once_with("10.2.0")
         self.sbom_tags.assert_called_once_with(
             "registry.osism.tech/kolla/release/2025.1/sbom:0.20260814.0", "2025.1"
         )
@@ -203,20 +222,20 @@ class MainTest(unittest.TestCase):
         status, out, err = self.run_main("-o", "2025.2")
 
         self.assertEqual(status, 0, err)
-        self.release_versions.assert_called_once_with("10.2.0", "2025.2")
+        self.release_versions.assert_called_once_with("10.2.0")
         self.assertIn(
             "Moving the kolla entries from release/2025.1/ to release/2025.2/", out
         )
         text = self.openstack.read_text()
         self.assertNotIn("release/2025.1/", text)
         self.assertIn("  - release/2025.2/keystone:27.0.3.20260814\n", text)
-        self.assertIn("  3 updated, 0 unchanged, 0 kept\n", out)
+        self.assertIn("  4 updated, 1 unchanged, 0 kept\n", out)
 
     def test_unlisted_images_of_the_release_are_counted(self):
         status, out, err = self.run_main("-n")
 
         self.assertIn(
-            "1 docker_images of the release are not listed in container-images-manager-stable.yml",
+            "4 docker_images of the release are not listed in container-images-manager-stable.yml",
             out,
         )
         self.assertIn(
@@ -229,6 +248,88 @@ class MainTest(unittest.TestCase):
 
         self.assertIn("  alerta\n", out)
         self.assertIn("  aodh-api\n", out)
+
+    def test_openstackclient_comes_from_the_runners(self):
+        self.runner_pins.return_value["openstackclient_version"] = "10.3.0"
+
+        status, out, err = self.run_main()
+
+        self.assertEqual(status, 0, err)
+        self.assertIn("  - openstackclient:10.3.0\n", self.manager.read_text())
+
+    def test_runner_openstackclient_wins_over_a_base_yml_pin(self):
+        self.release_versions.return_value["openstackclient"] = "9.9.9"
+
+        status, out, err = self.run_main()
+
+        self.assertEqual(status, 0, err)
+        self.assertIn("  - openstackclient:2025.1\n", self.manager.read_text())
+        self.assertIn("WARNING: base.yml pins openstackclient 9.9.9", err)
+
+    def test_missing_openstackclient_is_unresolved(self):
+        del self.runner_pins.return_value["openstackclient_version"]
+
+        status, out, err = self.run_main()
+
+        self.assertEqual(status, 2)
+        self.assertIn("openstackclient:2025.1: no openstackclient_version", err)
+
+    def test_ceph_pins_per_series_follow_the_ceph_version(self):
+        self.runner_pins.return_value = {
+            "ceph_image_versions": {"reef": "18.2.9", "tentacle": "20.2.4"},
+            "cephclient_versions": {"reef": "18.2.9", "tentacle": "20.2.4"},
+            "ceph_image_version": "{{ ceph_image_versions[ceph_version] }}",
+            "openstackclient_version": "2025.1",
+        }
+
+        status, out, err = self.run_main("--ceph-version", "reef")
+
+        self.assertEqual(status, 0, err)
+        text = self.openstack.read_text()
+        self.assertIn("  - ceph-daemon:18.2.9\n", text)
+        self.assertIn("  - cephclient:18.2.9\n", text)
+
+    def test_ceph_pins_per_series_without_a_ceph_version_are_unresolved(self):
+        self.runner_pins.return_value = {
+            "ceph_image_versions": {"reef": "18.2.9", "tentacle": "20.2.4"},
+            "cephclient_versions": {"reef": "18.2.9", "tentacle": "20.2.4"},
+            "openstackclient_version": "2025.1",
+        }
+
+        status, out, err = self.run_main()
+
+        self.assertEqual(status, 2)
+        self.assertIn(
+            "ceph-daemon:18.2.7: ceph_image_versions has reef, tentacle; "
+            "pass --ceph-version",
+            err,
+        )
+        self.assertIn("  - ceph-daemon:18.2.7\n", self.openstack.read_text())
+
+    def test_ceph_version_option_wins_over_the_runners(self):
+        self.runner_pins.return_value = {
+            "ceph_version": "reef",
+            "ceph_image_versions": {"reef": "18.2.9", "tentacle": "20.2.4"},
+            "cephclient_versions": {"reef": "18.2.9", "tentacle": "20.2.4"},
+            "openstackclient_version": "2025.1",
+        }
+
+        status, out, err = self.run_main("--ceph-version", "tentacle")
+
+        self.assertEqual(status, 0, err)
+        self.assertIn("  - ceph-daemon:20.2.4\n", self.openstack.read_text())
+
+    def test_unknown_image_in_images_osism_is_unresolved(self):
+        self.openstack.write_text(
+            OPENSTACK.replace(
+                "  - cephclient:18.2.8\n", "  - cephclient:18.2.8\n  - grafana:1.0\n"
+            )
+        )
+
+        status, out, err = self.run_main()
+
+        self.assertEqual(status, 2)
+        self.assertIn("grafana:1.0: no mapping in OSISM_IMAGES", err)
 
     def test_commented_entry_is_fatal_instead_of_invisible(self):
         self.manager.write_text(
@@ -318,64 +419,207 @@ class ScanFileTest(unittest.TestCase):
 
 class ReleaseVersionsTest(unittest.TestCase):
     BASE = "---\ndocker_images:\n  kolla: 0.20260814.0\n  netbox: v4.3.5\n"
-    OPENSTACK = "---\ndocker_images:\n  openstackclient: '2025.1'\n"
 
-    def release_versions(self, base, openstack):
+    def release_versions(self, base):
+        fetched = []
+
         def fetch(url, not_found=None):
-            return base if url.endswith("/base.yml") else openstack
+            fetched.append(url)
+            return base
 
-        err = io.StringIO()
-        with mock.patch.object(script, "fetch", fetch), contextlib.redirect_stderr(err):
-            versions = script.release_versions("10.2.0", "2025.1")
-        return versions, err.getvalue()
+        with mock.patch.object(script, "fetch", fetch):
+            versions = script.release_versions("10.2.0")
+        return versions, fetched
 
-    def test_openstackclient_falls_back_to_the_openstack_release_file(self):
-        versions, err = self.release_versions(self.BASE, self.OPENSTACK)
+    def test_returns_the_docker_images_of_base_yml_only(self):
+        versions, fetched = self.release_versions(self.BASE)
 
-        self.assertEqual(versions["openstackclient"], "2025.1")
-        self.assertEqual(versions["netbox"], "v4.3.5")
-        self.assertEqual(err, "")
-
-    def test_openstackclient_pinned_in_base_yml_wins(self):
-        versions, err = self.release_versions(
-            self.BASE + "  openstackclient: 9.9.9\n", self.OPENSTACK
-        )
-
-        self.assertEqual(versions["openstackclient"], "9.9.9")
-        self.assertEqual(err, "")
-
-    def test_openstackclient_missing_everywhere_is_a_warning(self):
-        versions, err = self.release_versions(self.BASE, "---\ndocker_images: {}\n")
-
-        self.assertNotIn("openstackclient", versions)
-        self.assertIn(
-            "WARNING: neither 10.2.0/base.yml nor latest/openstack-2025.1.yml pins", err
+        self.assertEqual(versions, {"kolla": "0.20260814.0", "netbox": "v4.3.5"})
+        # latest/ moves on after a release; nothing is read from it
+        self.assertEqual(
+            [url.rpartition("/main/")[2] for url in fetched], ["10.2.0/base.yml"]
         )
 
     def test_missing_kolla_is_fatal(self):
         with self.assertRaisesRegex(script.Fatal, "no docker_images.kolla entry"):
-            self.release_versions(
-                "---\ndocker_images:\n  netbox: v4.3.5\n", self.OPENSTACK
-            )
+            self.release_versions("---\ndocker_images:\n  netbox: v4.3.5\n")
 
 
-class SbomViaCraneTest(unittest.TestCase):
-    def crane(self, names):
+class RunnerPinsTest(unittest.TestCase):
+    VERSIONS = {
+        "ceph_ansible": "0.20260811.0",
+        "kolla_ansible": "0.20260814.0",
+        "osism_ansible": "0.20260811.0",
+    }
+    FILES = {
+        "ceph-ansible": "---\nceph_version: reef\ncephclient_version: '18.2.7'\n",
+        "kolla-ansible": "---\nopenstack_version: '2025.1'\nopenstackclient_version: '2025.1'\n",
+        "osism-ansible": "---\ncephclient_version: '18.2.8'\nopenstackclient_version: '10.3.0'\n",
+    }
+
+    def runner_pins(self, versions, files):
+        read = []
+
+        def image_file(image, path):
+            read.append((image, path))
+            name = image.rpartition("/")[2].partition(":")[0]
+            return files[name]
+
+        out = io.StringIO()
         with mock.patch.object(
-            script, "run", return_value=mock.Mock(stdout=tar_with(names))
-        ):
-            return script.sbom_via_crane(
-                "registry.osism.tech/kolla/release/2025.1/sbom:x"
-            )
+            script, "image_file", image_file
+        ), contextlib.redirect_stdout(out):
+            context = script.runner_pins(versions)
+        return context, read
 
-    def test_images_yml_is_found_under_any_root_spelling(self):
+    def test_later_runners_win_in_the_order_of_the_inventory(self):
+        context, read = self.runner_pins(self.VERSIONS, self.FILES)
+
+        self.assertEqual(
+            read,
+            [
+                (
+                    "registry.osism.tech/osism/ceph-ansible:0.20260811.0",
+                    script.RUNNER_VERSIONS,
+                ),
+                (
+                    "registry.osism.tech/osism/kolla-ansible:0.20260814.0",
+                    script.RUNNER_VERSIONS,
+                ),
+                (
+                    "registry.osism.tech/osism/osism-ansible:0.20260811.0",
+                    script.RUNNER_VERSIONS,
+                ),
+            ],
+        )
+        self.assertEqual(context["ceph_version"], "reef")
+        self.assertEqual(context["cephclient_version"], "18.2.8")
+        self.assertEqual(context["openstackclient_version"], "10.3.0")
+
+    def test_runner_the_release_does_not_pin_adds_no_layer(self):
+        # A release without ceph-ansible (Ceph deployed with cephadm) gives
+        # the pod no 100-versions-ceph-ansible.yml either.
+        versions = {k: v for k, v in self.VERSIONS.items() if k != "ceph_ansible"}
+
+        context, read = self.runner_pins(versions, self.FILES)
+
+        self.assertEqual(
+            [image.rpartition("/")[2] for image, _ in read],
+            ["kolla-ansible:0.20260814.0", "osism-ansible:0.20260811.0"],
+        )
+        self.assertNotIn("ceph_version", context)
+
+    def test_release_without_osism_ansible_is_fatal(self):
+        versions = {k: v for k, v in self.VERSIONS.items() if k != "osism_ansible"}
+
+        with self.assertRaisesRegex(
+            script.Fatal, "docker_images.osism_ansible missing"
+        ):
+            self.runner_pins(versions, self.FILES)
+
+    def test_versions_yml_that_is_no_mapping_is_fatal(self):
+        files = dict(self.FILES, **{"osism-ansible": "---\n- a\n"})
+
+        with self.assertRaisesRegex(
+            script.Fatal, "osism-ansible:0.20260811.0: .*not a mapping"
+        ):
+            self.runner_pins(self.VERSIONS, files)
+
+
+class RunnerPinTest(unittest.TestCase):
+    def test_plain_value(self):
+        self.assertEqual(
+            script.runner_pin({"ceph_image_version": "18.2.8"}, "ceph_image", None),
+            ("18.2.8", None),
+        )
+
+    def test_map_by_series(self):
+        context = {"ceph_image_versions": {"reef": "18.2.9", "tentacle": "20.2.4"}}
+        self.assertEqual(
+            script.runner_pin(context, "ceph_image", "tentacle"), ("20.2.4", None)
+        )
+
+    def test_map_behind_the_template_that_won(self):
+        context = {
+            "ceph_image_versions": {"reef": "18.2.9", "tentacle": "20.2.4"},
+            "ceph_image_version": "{{ ceph_image_versions[ceph_version] }}",
+        }
+        self.assertEqual(
+            script.runner_pin(context, "ceph_image", "reef"), ("18.2.9", None)
+        )
+
+    def test_literal_that_won_beats_a_map(self):
+        # The merged context keeps a map from one layer next to a literal
+        # from a later one; the pod deploys the literal.
+        context = {
+            "ceph_image_versions": {"reef": "18.2.9"},
+            "ceph_image_version": "18.2.7",
+        }
+        self.assertEqual(
+            script.runner_pin(context, "ceph_image", "reef"), ("18.2.7", None)
+        )
+
+    def test_series_the_map_lacks(self):
+        context = {"ceph_image_versions": {"reef": "18.2.9"}}
+        self.assertEqual(
+            script.runner_pin(context, "ceph_image", "squid"),
+            (None, "ceph_image_versions has no squid (it has reef)"),
+        )
+
+    def test_template_without_a_map(self):
+        context = {"ceph_image_version": "{{ ceph_image_versions[ceph_version] }}"}
+        tag, reason = script.runner_pin(context, "ceph_image", "reef")
+        self.assertIsNone(tag)
+        self.assertIn("ceph_image_version is a template", reason)
+
+    def test_missing(self):
+        self.assertEqual(
+            script.runner_pin({}, "openstackclient", None),
+            (None, "no openstackclient_version in the runners"),
+        )
+
+
+class FakeProcess:
+    """A crane export as file_via_crane sees it: a tar stream and an exit code."""
+
+    def __init__(self, stdout, returncode=0, stderr=b""):
+        self.stdout = io.BytesIO(stdout)
+        self.stderr = io.BytesIO(stderr)
+        self.returncode = None
+        self._returncode = returncode
+
+    def wait(self):
+        self.returncode = self._returncode
+        return self.returncode
+
+
+class FileViaCraneTest(unittest.TestCase):
+    def crane(self, process, path="/images.yml"):
+        with mock.patch.object(script.subprocess, "Popen", return_value=process):
+            return script.file_via_crane("registry.osism.tech/osism/x:1", path)
+
+    def test_file_is_found_under_any_root_spelling(self):
         for name in ("images.yml", "./images.yml", "/images.yml"):
             with self.subTest(name=name):
-                self.assertEqual(self.crane([name]), "images: []\n")
+                self.assertEqual(
+                    self.crane(FakeProcess(tar_with([name]))), "images: []\n"
+                )
 
-    def test_missing_images_yml_is_fatal(self):
-        with self.assertRaisesRegex(script.Fatal, "contains no images.yml"):
-            self.crane(["./other.yml", "./etc/images.yml"])
+    def test_file_in_a_directory(self):
+        process = FakeProcess(tar_with(["./ansible/group_vars/all/versions.yml"]))
+        self.assertEqual(
+            self.crane(process, "/ansible/group_vars/all/versions.yml"), "images: []\n"
+        )
+
+    def test_missing_file_is_fatal(self):
+        with self.assertRaisesRegex(script.Fatal, "contains no /images.yml"):
+            self.crane(FakeProcess(tar_with(["./other.yml", "./etc/images.yml"])))
+
+    def test_failed_export_is_fatal_with_its_error(self):
+        with self.assertRaisesRegex(
+            script.Fatal, "export .* failed:\nMANIFEST_UNKNOWN"
+        ):
+            self.crane(FakeProcess(b"", returncode=1, stderr=b"MANIFEST_UNKNOWN\n"))
 
 
 class WriteFileTest(unittest.TestCase):
