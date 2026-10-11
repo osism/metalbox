@@ -15,8 +15,8 @@ ara_server_tag: "1.8.0-r1"
 ara_server_image: "{{ docker_registry_ansible|default('registry.osism.tech') }}/osism/ara-server:{{ ara_server_tag }}"
 ceph_ansible_tag: "{{ ceph_version|default('quincy') }}"
 ceph_ansible_image: "{{ docker_registry_ansible|default('registry.osism.tech') }}/osism/ceph-ansible:{{ ceph_ansible_tag }}"
-patchman_memcached_tag: "1.6.45-alpine"
-patchman_memcached_image: "{{ docker_registry_memcached }}/memcached:{{ patchman_memcached_tag }}"
+traefik_tag: "v3.7.10"
+traefik_image: "{{ docker_registry_traefik }}/traefik:{{ traefik_tag }}"
 """
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -30,7 +30,7 @@ class PlaceholderModeTest(unittest.TestCase):
             {
                 "ara_server_image": "osism/ara-server:1.8.0-r1",
                 "ceph_ansible_image": "osism/ceph-ansible:reef",
-                "patchman_memcached_image": "library/memcached:1.6.45-alpine",
+                "traefik_image": "library/traefik:v3.7.10",
             },
         )
 
@@ -91,17 +91,15 @@ class RegistryModeTest(unittest.TestCase):
     def test_configured_registry_is_stripped(self):
         data = images.load_yaml(IMAGES)
         data["docker_registry_ansible"] = self.BOX
-        data["docker_registry_memcached"] = self.BOX + "/library"
+        data["docker_registry_traefik"] = self.BOX + "/library"
         refs = images.image_refs(data, data, registry=self.BOX)
         self.assertEqual(str(refs["ara_server_image"]), "osism/ara-server:1.8.0-r1")
-        self.assertEqual(
-            str(refs["patchman_memcached_image"]), "library/memcached:1.6.45-alpine"
-        )
+        self.assertEqual(str(refs["traefik_image"]), "library/traefik:v3.7.10")
 
     def test_path_in_registry_variable_is_kept(self):
         data = images.load_yaml(IMAGES)
         data["docker_registry_ansible"] = self.BOX + "/custom"
-        data["docker_registry_memcached"] = self.BOX
+        data["docker_registry_traefik"] = self.BOX
         refs = images.image_refs(data, data, registry=self.BOX)
         self.assertEqual(
             str(refs["ara_server_image"]), "custom/osism/ara-server:1.8.0-r1"
@@ -110,15 +108,13 @@ class RegistryModeTest(unittest.TestCase):
     def test_no_library_prefix_is_invented(self):
         data = images.load_yaml(IMAGES)
         data["docker_registry_ansible"] = self.BOX
-        data["docker_registry_memcached"] = self.BOX
+        data["docker_registry_traefik"] = self.BOX
         refs = images.image_refs(data, data, registry=self.BOX)
-        self.assertEqual(
-            str(refs["patchman_memcached_image"]), "memcached:1.6.45-alpine"
-        )
+        self.assertEqual(str(refs["traefik_image"]), "traefik:v3.7.10")
 
     def test_reference_outside_the_registry_is_an_error(self):
         data = images.load_yaml(IMAGES)
-        data["docker_registry_memcached"] = self.BOX
+        data["docker_registry_traefik"] = self.BOX
         # docker_registry_ansible unset: its default() points at registry.osism.tech
         with self.assertRaisesRegex(images.RenderError, "ara_server_image"):
             images.image_refs(data, data, registry=self.BOX)
