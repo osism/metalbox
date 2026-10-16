@@ -80,7 +80,6 @@ images_kolla:
   - prometheus-mysqld-exporter:2025.1
   - prometheus-node-exporter:2025.1
   - prometheus-openstack-exporter:2025.1
-  - prometheus-ovn-exporter:2025.1
   - prometheus-server:2025.1
   - proxysql:2025.1
   - rabbitmq:2025.1
