@@ -4,7 +4,6 @@ images_manager_stable_external:
   - library/adminer:5.5.1
   - library/httpd:alpine
   - library/mariadb:11.8.8
-  - library/memcached:1.6.45-alpine
   - library/nginx:1.29.3-alpine
   - library/postgres:16.14-alpine
   - library/redis:7.4.10-alpine
