@@ -78,7 +78,6 @@ images_kolla:
   - release/2025.1/prometheus-mysqld-exporter:0.16.0.20261001
   - release/2025.1/prometheus-node-exporter:1.8.2.20261001
   - release/2025.1/prometheus-openstack-exporter:1.7.0.20261001
-  - release/2025.1/prometheus-ovn-exporter:1.0.7.20261001
   - release/2025.1/prometheus-server:3.2.1.20261001
   - release/2025.1/proxysql:3.0.8.20261001
   - release/2025.1/rabbitmq:4.1.8.20261001
