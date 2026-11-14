@@ -58,8 +58,14 @@ fi
 # first read, so a truncated or corrupt file would leave the registry empty --
 # at an air-gapped site, with no upstream to fall back on. `tar -j` fully
 # decompresses the stream, so a full-length-but-corrupt file fails here too.
+# Run it in the same alpine image as the extraction below: its busybox tar
+# decompresses bzip2 itself, whereas GNU tar on the host execs an external
+# bzip2 binary that a fresh MetalBox does not have.
+TARBALL_DIR="$(dirname "$TARBALL_PATH")"
+TARBALL_FILENAME="$(basename "$TARBALL_PATH")"
 echo "Verifying $TARBALL_PATH ..."
-if ! tar tjf "$TARBALL_PATH" >/dev/null; then
+if ! docker run --rm -v "$TARBALL_DIR":/import:ro library/alpine:3 \
+        tar tjf "/import/$TARBALL_FILENAME" >/dev/null; then
     echo "ERROR: $TARBALL_PATH is not a readable bzip2 archive." >&2
     echo "       Refusing to continue: the import would destroy the current" >&2
     echo "       registry volume before reading it." >&2
@@ -77,9 +83,6 @@ echo "Creating new registry volume..."
 docker volume create "$VOLUME_NAME"
 
 echo "Extracting registry data to volume..."
-# Extract the directory path and filename from TARBALL_PATH
-TARBALL_DIR="$(dirname "$TARBALL_PATH")"
-TARBALL_FILENAME="$(basename "$TARBALL_PATH")"
 docker run --rm -v "$VOLUME_NAME":/volume -v "$TARBALL_DIR":/import:ro library/alpine:3 sh -c "cd /volume && tar xjf /import/$TARBALL_FILENAME"
 
 echo "Starting new registry container..."
