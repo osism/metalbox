@@ -21,4 +21,8 @@ popd
 
 wait_for_container_healthy
 
-cat /opt/configuration/environments/.vault_pass | osism vault password set
+cat /opt/configuration/environments/.vault_pass | osism vault password set || exit
+
+# The upgrade leaves the images it replaced without a name. They are unused
+# and the local registry still has them, so they only take up disk space.
+docker image prune -f

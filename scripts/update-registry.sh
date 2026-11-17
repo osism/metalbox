@@ -7,6 +7,7 @@ DOWNLOAD_PATH="${DOWNLOAD_PATH:-/opt}"
 CONTAINER_NAME="${CONTAINER_NAME:-registry}"
 VOLUME_NAME="${VOLUME_NAME:-registry}"
 SKIP_DOWNLOAD="${SKIP_DOWNLOAD:-false}"
+KEEP_TARBALL="${KEEP_TARBALL:-false}"
 
 set -e
 
@@ -87,5 +88,13 @@ docker run --rm -v "$VOLUME_NAME":/volume -v "$TARBALL_DIR":/import:ro library/a
 
 echo "Starting new registry container..."
 docker run -d -p 0.0.0.0:5001:5000 -v "$VOLUME_NAME":/var/lib/registry --name "$CONTAINER_NAME" --restart always library/registry:3
+
+# The archive is no longer needed once its content is in the volume. Only a
+# tarball in DOWNLOAD_PATH is removed: that is where this script downloads to.
+# A tarball the operator copied to /home/dragon is theirs to keep or delete.
+if [ "$KEEP_TARBALL" != "true" ] && [ "$TARBALL_DIR" = "${DOWNLOAD_PATH%/}" ]; then
+    echo "Removing $TARBALL_PATH (set KEEP_TARBALL=true to keep it)..."
+    sudo rm -f "$TARBALL_PATH"
+fi
 
 echo "Registry update completed successfully!"

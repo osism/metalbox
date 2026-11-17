@@ -13,4 +13,8 @@ osism apply -a upgrade common
 osism apply -a upgrade "$key_value_store"
 osism apply -a upgrade memcached
 osism apply -a upgrade rabbitmq
-osism apply -a upgrade mariadb
+osism apply -a upgrade mariadb || exit
+
+# The upgrade leaves the images it replaced without a name. They are unused
+# and the local registry still has them, so they only take up disk space.
+docker image prune -f

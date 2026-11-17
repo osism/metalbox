@@ -7,6 +7,7 @@ DOWNLOAD_PATH="${DOWNLOAD_PATH:-/opt}"
 CONTAINER_REGISTRY="${CONTAINER_REGISTRY:-localhost:5001}"
 REPOSITORY_IMAGE="${REPOSITORY_IMAGE:-osism/packages/ubuntu-noble}"
 SKIP_DOWNLOAD="${SKIP_DOWNLOAD:-false}"
+KEEP_TARBALL="${KEEP_TARBALL:-false}"
 SKIP_PUSH="${SKIP_PUSH:-true}"
 SKIP_SYNC="${SKIP_SYNC:-false}"
 DATA_DIRECTORY="${DATA_DIRECTORY:-/opt/httpd/data}"
@@ -59,6 +60,28 @@ TARGET_IMAGE="$CONTAINER_REGISTRY/$REPOSITORY_IMAGE:latest"
 echo "Tagging image as: $TARGET_IMAGE"
 docker tag "$LOADED_IMAGE" "$TARGET_IMAGE"
 
+# Drop the name the archive was saved under. It is only an alias of
+# TARGET_IMAGE, and nothing on the Metalbox refers to it.
+if [ "$LOADED_IMAGE" != "$TARGET_IMAGE" ]; then
+    docker rmi "$LOADED_IMAGE" >/dev/null
+fi
+
+# The image now holds everything the archive did. Only a tarball in
+# DOWNLOAD_PATH is removed: that is where this script downloads to. A tarball
+# the operator copied to /home/dragon is theirs to keep or delete.
+if [ "$KEEP_TARBALL" != "true" ] && [ "$(dirname "$TARBALL_PATH")" = "${DOWNLOAD_PATH%/}" ]; then
+    echo "Removing $TARBALL_PATH (set KEEP_TARBALL=true to keep it)..."
+    sudo rm -f "$TARBALL_PATH"
+fi
+
+# The previous repository image lost its last name to the tag above. The
+# httpd-data container that the httpd role ran from it has exited but still
+# pins it; the role recreates that container whenever it is applied again.
+if [ -n "$(docker ps -aq --filter name='^httpd-data$' --filter status=exited)" ]; then
+    docker rm httpd-data >/dev/null
+fi
+docker image prune -f
+
 if [ "$SKIP_PUSH" = "true" ]; then
     echo "SKIP_PUSH is set to true, skipping push to registry..."
 else
@@ -70,8 +93,11 @@ echo "Repository update completed successfully!"
 echo "Image available at: $TARGET_IMAGE"
 
 # Sync repository data from the container image to the httpd data directory.
-# This replicates what the Ansible httpd role does via the httpd-data container:
-# the rsync base image's CMD is "rsync -avz /data/ /export/root/"
+# This replicates what the Ansible httpd role does via the httpd-data container,
+# whose rsync base image's CMD is "rsync -avz /data/ /export/root/" -- but with
+# --delete: every image is a complete snapshot of the mirror, so packages it no
+# longer contains are outdated and would otherwise pile up. The sync is limited
+# to ubuntu-noble/ so --delete cannot reach anything else under root/.
 if [ "$SKIP_SYNC" = "true" ]; then
     echo "SKIP_SYNC is set to true, skipping repository data sync..."
     exit 0
@@ -94,7 +120,8 @@ if [ -d "/opt/httpd/data/root" ]; then
         -e USER_ID="$(stat -c %u "$DATA_DIRECTORY")" \
         -e GROUP_ID="$(stat -c %g "$DATA_DIRECTORY")" \
         -v "$DATA_DIRECTORY:/export" \
-        "$TARGET_IMAGE"
+        "$TARGET_IMAGE" \
+        /usr/bin/rsync -a --delete --stats /data/ubuntu-noble/ /export/root/ubuntu-noble/
     echo "Repository data sync completed successfully!"
 else
     echo "Skipping repository data sync: /opt/httpd/data/root does not exist."

@@ -19,4 +19,8 @@ pushd /opt/configuration/environments/manager
 bash run.sh netbox
 popd
 
-wait_for_container_healthy
+wait_for_container_healthy || exit
+
+# The upgrade leaves the images it replaced without a name. They are unused
+# and the local registry still has them, so they only take up disk space.
+docker image prune -f
