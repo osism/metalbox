@@ -33,6 +33,7 @@ images_kolla:
   - release/2025.1/horizon:25.3.3.20261001
   - release/2025.1/ironic-api:29.1.1.20261001
   - release/2025.1/ironic-conductor:29.1.1.20261001
+  - release/2025.1/ironic-pxe:29.1.1.20261001
   - release/2025.1/iscsid:2.1.9.20261001
   - release/2025.1/keepalived:2.2.8.20261001
   - release/2025.1/keystone-fernet:27.1.1.20261001
@@ -49,6 +50,7 @@ images_kolla:
   - release/2025.1/neutron-server:26.0.7.20261001
   - release/2025.1/nova-api:31.3.2.20261001
   - release/2025.1/nova-compute:31.3.2.20261001
+  - release/2025.1/nova-compute-ironic:31.3.2.20261001
   - release/2025.1/nova-conductor:31.3.2.20261001
   - release/2025.1/nova-libvirt:10.0.0.20261001
   - release/2025.1/nova-novncproxy:31.3.2.20261001

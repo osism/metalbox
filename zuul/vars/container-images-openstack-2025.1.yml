@@ -35,6 +35,7 @@ images_kolla:
   - horizon:2025.1
   - ironic-api:2025.1
   - ironic-conductor:2025.1
+  - ironic-pxe:2025.1
   - iscsid:2025.1
   - keepalived:2025.1
   - keystone-fernet:2025.1
@@ -51,6 +52,7 @@ images_kolla:
   - neutron-server:2025.1
   - nova-api:2025.1
   - nova-compute:2025.1
+  - nova-compute-ironic:2025.1
   - nova-conductor:2025.1
   - nova-libvirt:2025.1
   - nova-novncproxy:2025.1
