@@ -36,6 +36,7 @@ images_kolla:
   - httpd:2026.1
   - ironic-api:2026.1
   - ironic-conductor:2026.1
+  - ironic-pxe:2026.1
   - iscsid:2026.1
   - keepalived:2026.1
   - keystone-fernet:2026.1
@@ -50,6 +51,7 @@ images_kolla:
   - neutron-server:2026.1
   - nova-api:2026.1
   - nova-compute:2026.1
+  - nova-compute-ironic:2026.1
   - nova-conductor:2026.1
   - nova-libvirt:2026.1
   - nova-novncproxy:2026.1
