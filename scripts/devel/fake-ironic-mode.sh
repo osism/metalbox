@@ -3,11 +3,16 @@
 # Switch Ironic from redfish mode to fake mode
 #
 # Usage:
-#   ./scripts/toggle-ironic-mode.sh [fake|status]
+#   ./scripts/devel/fake-ironic-mode.sh fake [-y|--yes]
+#   ./scripts/devel/fake-ironic-mode.sh status
 #
 # Commands:
 #   fake     - Switch to fake mode (for testing without real hardware)
 #   status   - Show current mode
+#
+# Options:
+#   -y, --yes - Switch without asking for confirmation (required when
+#               stdin is not a terminal)
 #
 # Note: This script only supports switching from redfish to fake mode.
 #       Switching back to redfish is not supported.
@@ -51,11 +56,16 @@ print_error() {
 # Function to show usage
 usage() {
     cat << EOF
-Usage: $(basename "$0") [fake|status]
+Usage: $(basename "$0") fake [-y|--yes]
+       $(basename "$0") status
 
 Commands:
   fake     - Switch to fake mode (for testing without real hardware)
   status   - Show current mode
+
+Options:
+  -y, --yes - Switch without asking for confirmation (required when
+              stdin is not a terminal)
 
 Note: This script only supports switching from redfish to fake mode.
       Switching back to redfish is not supported.
@@ -63,6 +73,7 @@ Note: This script only supports switching from redfish to fake mode.
 Examples:
   $(basename "$0") status           # Check current mode
   $(basename "$0") fake             # Switch from redfish to fake mode
+  $(basename "$0") fake --yes       # Same, without the confirmation prompt
 EOF
     exit 1
 }
@@ -236,6 +247,22 @@ main() {
     fi
 
     local command="$1"
+    shift
+
+    local assume_yes=false
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -y|--yes)
+                assume_yes=true
+                ;;
+            *)
+                print_error "Unknown option: $1"
+                echo ""
+                usage
+                ;;
+        esac
+        shift
+    done
 
     # Check project files
     check_project_files
@@ -268,12 +295,20 @@ main() {
             echo ""
             print_warning "NOTE: Switching back to redfish mode is not supported by this script!"
             echo ""
-            read -p "Continue? (yes/no): " -r
-            echo ""
 
-            if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
-                print_info "Cancelled by user"
-                exit 0
+            if [[ "$assume_yes" != true ]]; then
+                if [[ ! -t 0 ]]; then
+                    print_error "stdin is not a terminal: use --yes to confirm"
+                    exit 1
+                fi
+
+                read -p "Continue? (yes/no): " -r
+                echo ""
+
+                if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+                    print_error "Cancelled by user"
+                    exit 1
+                fi
             fi
 
             # Switch mode
