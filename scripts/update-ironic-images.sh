@@ -53,45 +53,27 @@ ALL_IRONIC_IMAGES=(
     "osism-esp.raw"
 )
 
+# Validate the filter here: get_filtered_images runs in a subshell, where an
+# exit would not stop the script.
+case "$IMAGE_FILTER" in
+    ""|"node"|"ipa"|"esp") ;;
+    *)
+        echo "ERROR: Invalid image filter '$IMAGE_FILTER'. Valid options: node, ipa, esp"
+        echo "Use '$0 --help' for more information."
+        exit 1
+        ;;
+esac
+
 # Function to filter images based on IMAGE_FILTER
 get_filtered_images() {
     local filter="$1"
-    local filtered_images=()
-    
-    case "$filter" in
-        "node")
-            for image in "${ALL_IRONIC_IMAGES[@]}"; do
-                if [[ "$image" == *"osism-node"* ]]; then
-                    filtered_images+=("$image")
-                fi
-            done
-            ;;
-        "ipa")
-            for image in "${ALL_IRONIC_IMAGES[@]}"; do
-                if [[ "$image" == *"osism-ipa"* ]]; then
-                    filtered_images+=("$image")
-                fi
-            done
-            ;;
-        "esp")
-            for image in "${ALL_IRONIC_IMAGES[@]}"; do
-                if [[ "$image" == *"osism-esp"* ]]; then
-                    filtered_images+=("$image")
-                fi
-            done
-            ;;
-        "")
-            # No filter - use all images
-            filtered_images=("${ALL_IRONIC_IMAGES[@]}")
-            ;;
-        *)
-            echo "ERROR: Invalid image filter '$filter'. Valid options: node, ipa, esp"
-            echo "Use '$0 --help' for more information."
-            exit 1
-            ;;
-    esac
-    
-    printf '%s\n' "${filtered_images[@]}"
+    local image
+
+    for image in "${ALL_IRONIC_IMAGES[@]}"; do
+        if [[ -z "$filter" || "$image" == "osism-$filter"* ]]; then
+            echo "$image"
+        fi
+    done
 }
 
 # Get the list of images to process
