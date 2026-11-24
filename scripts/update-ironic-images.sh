@@ -19,6 +19,13 @@ Environment Variables:
   SKIP_DOWNLOAD   Skip download and copy from SOURCE_PATH (default: false)
   IMAGE_FILTER    Filter images by type: node, ipa, esp (optional)
 
+Every image is checked against its checksum file: osism-ipa.CHECKSUM
+(covering both IPA files), osism-node.qcow2.CHECKSUM and
+osism-esp.raw.CHECKSUM. With SKIP_DOWNLOAD=true the files in SOURCE_PATH are
+checked before any of them is copied. osism-node.qcow2.CHECKSUM is required
+there, because Ironic reads it when it deploys a node; without the other two
+checksum files the IPA and ESP images are copied unverified, with a warning.
+
 Examples:
   $0              # Process all images
   $0 node         # Process only osism-node images
@@ -44,17 +51,20 @@ SKIP_DOWNLOAD="${SKIP_DOWNLOAD:-false}"
 # Image filtering - command line argument takes precedence over environment variable
 IMAGE_FILTER="${1:-${IMAGE_FILTER:-}}"
 
-# All available Ironic images
-ALL_IRONIC_IMAGES=(
-    "osism-ipa.initramfs"
-    "osism-ipa.kernel"
-    "osism-node.qcow2"
-    "osism-node.qcow2.CHECKSUM"
-    "osism-esp.raw"
+# The Ironic images, in groups that are updated together. Each group has one
+# checksum file that covers all of its images.
+ALL_GROUPS=(ipa node esp)
+declare -A GROUP_IMAGES=(
+    [ipa]="osism-ipa.initramfs osism-ipa.kernel"
+    [node]="osism-node.qcow2"
+    [esp]="osism-esp.raw"
+)
+declare -A GROUP_CHECKSUM=(
+    [ipa]="osism-ipa.CHECKSUM"
+    [node]="osism-node.qcow2.CHECKSUM"
+    [esp]="osism-esp.raw.CHECKSUM"
 )
 
-# Validate the filter here: get_filtered_images runs in a subshell, where an
-# exit would not stop the script.
 case "$IMAGE_FILTER" in
     ""|"node"|"ipa"|"esp") ;;
     *)
@@ -64,20 +74,101 @@ case "$IMAGE_FILTER" in
         ;;
 esac
 
-# Function to filter images based on IMAGE_FILTER
-get_filtered_images() {
-    local filter="$1"
-    local image
+if [[ -n "$IMAGE_FILTER" ]]; then
+    SELECTED_GROUPS=("$IMAGE_FILTER")
+else
+    SELECTED_GROUPS=("${ALL_GROUPS[@]}")
+fi
 
-    for image in "${ALL_IRONIC_IMAGES[@]}"; do
-        if [[ -z "$filter" || "$image" == "osism-$filter"* ]]; then
-            echo "$image"
-        fi
-    done
+verify() {
+    local dir="$1"
+    local checksum="$2"
+    (cd "$dir" && sha256sum -c --strict "$checksum")
 }
 
-# Get the list of images to process
-readarray -t IRONIC_IMAGES < <(get_filtered_images "$IMAGE_FILTER")
+download() {
+    local file="$1"
+
+    echo "Downloading $BASE_URL/$file ..."
+    # -f: an HTTP error must fail the run, not be saved as the image.
+    if ! sudo curl -fL --retry 5 --retry-all-errors --retry-delay 10 \
+            -o "$TARGET_PATH/$file" "$BASE_URL/$file"; then
+        echo "ERROR: Failed to download $file." >&2
+        echo "       $TARGET_PATH/$file may be incomplete; run the update again." >&2
+        exit 1
+    fi
+}
+
+update_group_online() {
+    local group="$1"
+    local checksum="${GROUP_CHECKSUM[$group]}"
+    local images image
+    read -ra images <<< "${GROUP_IMAGES[$group]}"
+
+    for image in "${images[@]}"; do
+        download "$image"
+    done
+    # The checksum comes last: until it is replaced, the previous checksum
+    # stays next to a new or partial image, and a node deployed in the
+    # meantime fails Ironic's checksum check instead of getting that image.
+    download "$checksum"
+
+    echo "Verifying ${images[*]} ..."
+    if ! verify "$TARGET_PATH" "$checksum"; then
+        echo "ERROR: ${images[*]} in $TARGET_PATH do not match $checksum." >&2
+        echo "       The downloaded files are damaged; run the update again." >&2
+        exit 1
+    fi
+}
+
+update_group_offline() {
+    local group="$1"
+    local checksum="${GROUP_CHECKSUM[$group]}"
+    local images image file
+    local missing=()
+    read -ra images <<< "${GROUP_IMAGES[$group]}"
+
+    for image in "${images[@]}"; do
+        if [ ! -f "$SOURCE_PATH/$image" ]; then
+            missing+=("$image")
+        fi
+    done
+    if [ "${#missing[@]}" -eq "${#images[@]}" ]; then
+        echo "WARNING: Expected image ${images[*]} not found in $SOURCE_PATH!"
+        return 0
+    fi
+    if [ "${#missing[@]}" -gt 0 ]; then
+        # The IPA kernel and initramfs only work as a pair from one build.
+        echo "ERROR: ${missing[*]} not found in $SOURCE_PATH." >&2
+        echo "       ${images[*]} are only updated together." >&2
+        exit 1
+    fi
+
+    local files=("${images[@]}")
+    if [ -f "$SOURCE_PATH/$checksum" ]; then
+        echo "Verifying ${images[*]} in $SOURCE_PATH ..."
+        if ! verify "$SOURCE_PATH" "$checksum"; then
+            echo "ERROR: ${images[*]} in $SOURCE_PATH do not match $checksum." >&2
+            echo "       Nothing has been copied." >&2
+            exit 1
+        fi
+        files+=("$checksum")
+    elif [ "$group" = "node" ]; then
+        # Ironic reads osism-node.qcow2.CHECKSUM at deploy time: a new image
+        # next to the old checksum would fail every deploy.
+        echo "ERROR: $checksum not found in $SOURCE_PATH." >&2
+        echo "       It has to be updated together with ${images[*]}." >&2
+        exit 1
+    else
+        echo "WARNING: $checksum not found in $SOURCE_PATH;" \
+             "copying ${images[*]} unverified."
+    fi
+
+    for file in "${files[@]}"; do
+        echo "Copying $file to $TARGET_PATH ..."
+        sudo cp "$SOURCE_PATH/$file" "$TARGET_PATH/$file"
+    done
+}
 
 set -e
 
@@ -87,7 +178,6 @@ if [[ -n "$IMAGE_FILTER" ]]; then
 else
     echo "Processing all images (no filter applied)"
 fi
-echo "Images to process: ${#IRONIC_IMAGES[@]}"
 
 # Create target directory if it doesn't exist
 if [ ! -d "$TARGET_PATH" ]; then
@@ -95,37 +185,13 @@ if [ ! -d "$TARGET_PATH" ]; then
     sudo mkdir -p "$TARGET_PATH"
 fi
 
-# Process each image
-for IMAGE in "${IRONIC_IMAGES[@]}"; do
-    echo "Processing image: $IMAGE"
-    
+for GROUP in "${SELECTED_GROUPS[@]}"; do
+    echo "Processing images: ${GROUP_IMAGES[$GROUP]}"
     if [ "$SKIP_DOWNLOAD" = "true" ]; then
-        echo "SKIP_DOWNLOAD is set to true, skipping download for $IMAGE..."
-        
-        # Check if image exists in source path
-        if [ -f "$SOURCE_PATH/$IMAGE" ]; then
-            echo "Found $IMAGE in $SOURCE_PATH"
-            echo "Copying $IMAGE to $TARGET_PATH..."
-            sudo cp "$SOURCE_PATH/$IMAGE" "$TARGET_PATH/"
-            echo "Successfully copied $IMAGE"
-        else
-            echo "WARNING: Expected image $IMAGE not found in $SOURCE_PATH!"
-        fi
+        update_group_offline "$GROUP"
     else
-        echo "Downloading $IMAGE from: $BASE_URL/$IMAGE"
-        echo "Saving to: $TARGET_PATH/$IMAGE"
-        
-        # Download the image directly to target path
-        sudo curl -L -o "$TARGET_PATH/$IMAGE" "$BASE_URL/$IMAGE"
-        
-        if [ -f "$TARGET_PATH/$IMAGE" ]; then
-            echo "Successfully downloaded $IMAGE"
-        else
-            echo "ERROR: Failed to download $IMAGE"
-            exit 1
-        fi
+        update_group_online "$GROUP"
     fi
-    
     echo "---"
 done
 
