@@ -3,7 +3,7 @@
 # versions
 
 manager_version: latest
-openstack_version: 2024.2
+openstack_version: 2026.1
 
 ##########################################################
 # services
